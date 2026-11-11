@@ -1,0 +1,8 @@
+{
+  "name": "Agente Acadêmico ADS - FSG",
+  "description": "Assistente inteligente acadêmico para o curso de Análise e Desenvolvimento de Sistemas da FSG. Criado por Davi Chidem, Guilherme Matte e João.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
