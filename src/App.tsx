@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar, ActiveTab } from './components/Navbar';
+import { MaterialsManager } from './components/MaterialsManager';
 import { ChatTutor } from './components/ChatTutor';
 import { StudyPlanner } from './components/StudyPlanner';
 import { SimuladoEngine } from './components/SimuladoEngine';
@@ -8,130 +9,228 @@ import { GoogleCalendarSync } from './components/GoogleCalendarSync';
 import { KnowledgeBase } from './components/KnowledgeBase';
 import { PromptEngineeringLab } from './components/PromptEngineeringLab';
 import { ProjectReport } from './components/ProjectReport';
-import { INITIAL_EXAMS } from './data/fsgData';
-import { ExamEvent } from './types/academic';
+import {
+  useDocuments,
+  useDisciplines,
+  useEvents,
+  useStudyPlans,
+  useQuizzes,
+  useFlashcards,
+  storage,
+} from './services/storage';
+import { Trash2, AlertTriangle } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('chat');
-  const [exams, setExams] = useState<ExamEvent[]>(() => {
-    try {
-      const saved = localStorage.getItem('fsg_ads_exams');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return INITIAL_EXAMS;
-  });
+  const { data: documents, loading: loadingDocs } = useDocuments();
+  const { data: disciplines } = useDisciplines();
+  const { data: events } = useEvents();
+  const { data: studyPlans } = useStudyPlans();
+  const { data: quizzes } = useQuizzes();
+  const { data: flashcards } = useFlashcards();
 
-  // Selected parameters for cross-tab transitions
-  const [plannerSubject, setPlannerSubject] = useState('Modelagem e Banco de Dados Relacional');
-  const [plannerDate, setPlannerDate] = useState('2026-11-20');
-  const [quizSubject, setQuizSubject] = useState('Modelagem e Banco de Dados Relacional');
-  const [pendingChatPrompt, setPendingChatPrompt] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('materials');
+  const [hasInitializedDefaultTab, setHasInitializedDefaultTab] = useState(false);
+
+  // Cross-tab context state (without any hardcoded mock strings or dates)
+  const [selectedDisciplineId, setSelectedDisciplineId] = useState<string>('');
+  const [pendingErrorFlashcards, setPendingErrorFlashcards] = useState<{
+    disciplineId: string;
+    wrongQuestionsContext: string[];
+  } | null>(null);
+  const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('fsg_ads_exams', JSON.stringify(exams));
-    } catch {
-      // fallback
+    if (!loadingDocs && !hasInitializedDefaultTab) {
+      setActiveTab(documents.length > 0 ? 'chat' : 'materials');
+      setHasInitializedDefaultTab(true);
     }
-  }, [exams]);
+  }, [loadingDocs, documents.length, hasInitializedDefaultTab]);
 
-  const handleAddExam = (newExam: ExamEvent) => {
-    setExams((prev) => [newExam, ...prev]);
-  };
+  const pendingReviewCount = events.filter((e) => e.needsReview).length;
 
-  const handleOpenPlanner = (subject: string, date: string) => {
-    setPlannerSubject(subject);
-    setPlannerDate(date);
+  const handleOpenPlannerWithDiscipline = (disciplineId: string) => {
+    setSelectedDisciplineId(disciplineId);
     setActiveTab('planner');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleOpenQuiz = (subject: string) => {
-    setQuizSubject(subject);
+  const handleOpenSimuladoWithDiscipline = (disciplineId: string) => {
+    setSelectedDisciplineId(disciplineId);
     setActiveTab('quiz');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleOpenChatWithPrompt = (promptText: string) => {
-    setPendingChatPrompt(promptText);
-    setActiveTab('chat');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleOpenFlashcardsWithDiscipline = (disciplineId: string) => {
+    setSelectedDisciplineId(disciplineId);
+    setActiveTab('flashcards');
+  };
+
+  const handleGenerateFlashcardsFromErrors = (
+    disciplineId: string,
+    wrongQuestionsContext: string[]
+  ) => {
+    setSelectedDisciplineId(disciplineId);
+    setPendingErrorFlashcards({ disciplineId, wrongQuestionsContext });
+    setActiveTab('flashcards');
   };
 
   return (
-    <div className="min-h-dvh bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-600/30 selection:text-indigo-200 overflow-x-hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-600/30 selection:text-indigo-200">
       <Navbar
         activeTab={activeTab}
-        setActiveTab={(tab) => {
-          setActiveTab(tab);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        examCount={exams.length}
+        setActiveTab={setActiveTab}
+        documentsCount={documents.length}
+        pendingReviewCount={pendingReviewCount}
       />
 
-      <main className="flex-1 w-full flex flex-col">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8">
+        {activeTab === 'materials' && (
+          <MaterialsManager
+            documents={documents}
+            disciplines={disciplines}
+            events={events}
+            onNavigateToTab={(tab) => setActiveTab(tab)}
+          />
+        )}
+
         {activeTab === 'chat' && (
           <ChatTutor
-            initialPrompt={pendingChatPrompt}
-            onClearInitialPrompt={() => setPendingChatPrompt(null)}
-            onOpenPlannerWithParams={handleOpenPlanner}
-            onOpenSimuladoWithSubject={handleOpenQuiz}
+            disciplines={disciplines}
+            events={events}
+            documents={documents}
+            onNavigateToMaterials={() => setActiveTab('materials')}
+            onOpenPlannerWithDiscipline={handleOpenPlannerWithDiscipline}
+            onOpenSimuladoWithDiscipline={handleOpenSimuladoWithDiscipline}
+            onOpenFlashcardsWithDiscipline={handleOpenFlashcardsWithDiscipline}
             onNavigateToCalendar={() => setActiveTab('calendar')}
           />
         )}
 
         {activeTab === 'planner' && (
           <StudyPlanner
-            initialSubject={plannerSubject}
-            initialDate={plannerDate}
+            disciplines={disciplines}
+            events={events}
+            documents={documents}
+            studyPlans={studyPlans}
+            initialDisciplineId={selectedDisciplineId}
+            onNavigateToMaterials={() => setActiveTab('materials')}
             onNavigateToCalendar={() => setActiveTab('calendar')}
-            onNavigateToQuiz={handleOpenQuiz}
+            onNavigateToQuiz={handleOpenSimuladoWithDiscipline}
           />
         )}
 
         {activeTab === 'quiz' && (
           <SimuladoEngine
-            initialSubject={quizSubject}
-            onNavigateToPlanner={(subject) => handleOpenPlanner(subject, '2026-11-20')}
+            disciplines={disciplines}
+            documents={documents}
+            quizzes={quizzes}
+            initialDisciplineId={selectedDisciplineId}
+            onNavigateToMaterials={() => setActiveTab('materials')}
+            onNavigateToPlanner={handleOpenPlannerWithDiscipline}
+            onGenerateFlashcardsFromErrors={handleGenerateFlashcardsFromErrors}
           />
         )}
 
-        {activeTab === 'flashcards' && <FlashcardsView />}
+        {activeTab === 'flashcards' && (
+          <FlashcardsView
+            disciplines={disciplines}
+            documents={documents}
+            flashcards={flashcards}
+            initialDisciplineId={selectedDisciplineId}
+            pendingErrorContext={pendingErrorFlashcards}
+            onClearPendingErrorContext={() => setPendingErrorFlashcards(null)}
+            onNavigateToMaterials={() => setActiveTab('materials')}
+          />
+        )}
 
         {activeTab === 'calendar' && (
           <GoogleCalendarSync
-            exams={exams}
-            onAddExam={handleAddExam}
-            onNavigateToPlannerWithExam={handleOpenPlanner}
+            events={events}
+            disciplines={disciplines}
+            studyPlans={studyPlans}
+            onNavigateToMaterials={() => setActiveTab('materials')}
+            onNavigateToPlanner={handleOpenPlannerWithDiscipline}
           />
         )}
 
-        {activeTab === 'subjects' && (
+        {activeTab === 'knowledge' && (
           <KnowledgeBase
-            onSelectSubjectForChat={handleOpenChatWithPrompt}
-            onSelectSubjectForPlanner={(subject) => handleOpenPlanner(subject, '2026-11-20')}
-            onSelectSubjectForQuiz={handleOpenQuiz}
+            disciplines={disciplines}
+            documents={documents}
+            onNavigateToMaterials={() => setActiveTab('materials')}
+            onOpenSimulado={handleOpenSimuladoWithDiscipline}
+            onOpenFlashcards={handleOpenFlashcardsWithDiscipline}
+            onOpenPlanner={handleOpenPlannerWithDiscipline}
           />
         )}
 
         {activeTab === 'prompts' && <PromptEngineeringLab />}
 
-        {activeTab === 'report' && <ProjectReport />}
+        {activeTab === 'report' && (
+          <ProjectReport
+            documentsCount={documents.length}
+            disciplinesCount={disciplines.length}
+            eventsCount={events.length}
+          />
+        )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/90 py-4 px-4 text-xs text-slate-400 print:hidden">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
-          <p>
-            <strong className="text-slate-300">Agente Acadêmico ADS · FSG</strong> — Assistente de Estudos e Cronogramas
-          </p>
-          <p className="text-slate-400">
-            Davi Chidem · Guilherme Matte · João
-          </p>
+      {/* Footer with Clear All Data action */}
+      <footer className="border-t border-slate-900 bg-slate-950/90 py-5 px-4 sm:px-6 lg:px-8 mt-auto">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <div>
+            <span>Agente Acadêmico ADS – FSG · Equipe: Davi Chidem, Guilherme Matte e João</span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <span className="font-mono tabular-nums">
+              {documents.length} doc(s) · {disciplines.length} matéria(s) · {events.length} evento(s)
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowClearDataConfirm(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-red-950/60 text-slate-400 hover:text-red-300 border border-slate-800 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Apagar todos os meus dados</span>
+            </button>
+          </div>
         </div>
       </footer>
+
+      {/* Modal: Clear All Data Confirmation */}
+      {showClearDataConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-2.5 text-red-400 font-bold text-base">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <span>Apagar Todos os Dados Locais?</span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Esta ação removerá permanentemente todos os documentos enviados, disciplinas extraídas, eventos,
+              cronogramas, simulados e flashcards armazenados no IndexedDB deste navegador.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowClearDataConfirm(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await storage.clearAllData();
+                  setShowClearDataConfirm(false);
+                  setActiveTab('materials');
+                }}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold cursor-pointer"
+              >
+                Sim, Apagar Tudo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

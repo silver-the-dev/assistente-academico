@@ -1,32 +1,33 @@
 import React, { useState } from 'react';
-import { 
-  Code2, 
-  GitBranch, 
-  CheckCircle, 
-  Copy, 
-  Check, 
-  Terminal, 
-  Play, 
-  TrendingUp
+import {
+  Code2,
+  GitBranch,
+  CheckCircle,
+  Copy,
+  Check,
+  Terminal,
+  Play,
+  TrendingUp,
 } from 'lucide-react';
-import { marked } from 'marked';
 import { PROMPT_VERSIONS } from '../data/fsgData';
 import { PromptVersion } from '../types/academic';
+import { renderSafeMarkdown } from '../utils/markdown';
 
 export const PromptEngineeringLab: React.FC = () => {
   const [selectedPromptCategory, setSelectedPromptCategory] = useState<string>(PROMPT_VERSIONS[0].id);
   const [selectedVersion, setSelectedVersion] = useState<'v1' | 'v2' | 'v3'>('v3');
   const [copiedText, setCopiedText] = useState(false);
 
-  // Playground state
   const [playgroundPrompt, setPlaygroundPrompt] = useState(
-    'Explique o princípio do Polimorfismo em Orientação a Objetos de forma simples com exemplo em código e pegadinhas de prova da FSG.'
+    'Explique o princípio do Polimorfismo em Orientação a Objetos de forma simples com exemplo em código e pegadinhas de prova de ADS.'
   );
   const [playgroundOutput, setPlaygroundOutput] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
 
-  const activeCategory: PromptVersion = PROMPT_VERSIONS.find((p) => p.id === selectedPromptCategory) || PROMPT_VERSIONS[0];
-  const activeVersionData = activeCategory.versions.find((v) => v.version === selectedVersion) || activeCategory.versions[2];
+  const activeCategory: PromptVersion =
+    PROMPT_VERSIONS.find((p) => p.id === selectedPromptCategory) || PROMPT_VERSIONS[0];
+  const activeVersionData =
+    activeCategory.versions.find((v) => v.version === selectedVersion) || activeCategory.versions[2];
 
   const handleCopyPrompt = () => {
     navigator.clipboard.writeText(activeVersionData.promptText);
@@ -44,23 +45,22 @@ export const PromptEngineeringLab: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [{ role: 'user', content: playgroundPrompt }],
+          message: playgroundPrompt,
         }),
       });
 
-      if (!response.ok) throw new Error('Falha ao testar no Playground');
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Falha ao testar no Playground');
       setPlaygroundOutput(data.reply);
-    } catch (err: any) {
-      setPlaygroundOutput(`### Erro no Playground\n${err.message}`);
+    } catch (err: unknown) {
+      setPlaygroundOutput(`### Erro no Playground\n${(err as Error)?.message || 'Erro inesperado'}`);
     } finally {
       setIsTesting(false);
     }
   };
 
   return (
-    <div className="max-w-6xl w-full mx-auto px-3 sm:px-6 py-5 sm:py-6">
-      {/* Title */}
+    <div className="max-w-6xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6">
       <div className="mb-6">
         <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-wide mb-1">
           <Code2 className="h-4 w-4 shrink-0" />
@@ -70,7 +70,7 @@ export const PromptEngineeringLab: React.FC = () => {
           Evolução de Prompts (v1 → v2 → v3)
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
-          Documentação sistemática dos refinamentos de prompt, regras anti-alucinação de datas e testes de qualidade realizados por Davi Chidem, Guilherme Matte e João.
+          Documentação sistemática dos refinamentos de prompt, schemas JSON com validação Zod, regras anti-alucinação de datas e testes realizados por Davi Chidem, Guilherme Matte e João.
         </p>
       </div>
 
@@ -96,9 +96,7 @@ export const PromptEngineeringLab: React.FC = () => {
                 <GitBranch className="h-4 w-4 shrink-0" />
                 <span className="truncate">{pv.title}</span>
               </div>
-              <span className="text-[11px] opacity-80 shrink-0">
-                {pv.category}
-              </span>
+              <span className="text-[11px] opacity-80 shrink-0">{pv.category}</span>
             </button>
           );
         })}
@@ -106,7 +104,6 @@ export const PromptEngineeringLab: React.FC = () => {
 
       {/* Version Tabs & Detailed Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 mb-8">
-        {/* Version navigation bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
           <div className="flex flex-wrap items-center gap-2">
             {(['v1', 'v2', 'v3'] as const).map((v) => {
@@ -125,11 +122,7 @@ export const PromptEngineeringLab: React.FC = () => {
                   }`}
                 >
                   <span className="font-mono">{v.toUpperCase()}</span>
-                  {vData && (
-                    <span className="text-[11px] opacity-85">
-                      · {vData.status}
-                    </span>
-                  )}
+                  {vData && <span className="text-[11px] opacity-85">· {vData.status}</span>}
                 </button>
               );
             })}
@@ -145,9 +138,7 @@ export const PromptEngineeringLab: React.FC = () => {
           </button>
         </div>
 
-        {/* Version Content */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-5">
-          {/* Left: Prompt Text */}
           <div className="lg:col-span-7 space-y-4 min-w-0">
             <div>
               <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
@@ -163,13 +154,10 @@ export const PromptEngineeringLab: React.FC = () => {
               <span className="text-xs font-semibold text-slate-300 block mb-1">
                 Resultado Esperado / Comportamento:
               </span>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                {activeVersionData.targetOutput}
-              </p>
+              <p className="text-xs text-slate-400 leading-relaxed">{activeVersionData.targetOutput}</p>
             </div>
           </div>
 
-          {/* Right: Evolutions & Rationales */}
           <div className="lg:col-span-5 bg-slate-950 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4 flex flex-col justify-between">
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
@@ -210,12 +198,10 @@ export const PromptEngineeringLab: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
         <div className="flex items-center gap-2 mb-1.5">
           <Terminal className="h-5 w-5 text-indigo-400 shrink-0" />
-          <h2 className="text-sm sm:text-base font-bold text-white">
-            Playground Interativo de Teste
-          </h2>
+          <h2 className="text-sm sm:text-base font-bold text-white">Playground Interativo de Teste</h2>
         </div>
         <p className="text-xs text-slate-400 mb-4">
-          Modifique o prompt ou envie variações para inspecionar a resposta em tempo real com a base de conhecimento de ADS da FSG.
+          Modifique o prompt ou envie variações para inspecionar a resposta em tempo real com o Gemini 4 Argon.
         </p>
 
         <div className="space-y-4">
@@ -231,7 +217,7 @@ export const PromptEngineeringLab: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span className="text-[11px] text-slate-400">
-              System Instruction: Base de Conhecimento FSG (15 matérias) ativa no servidor
+              System Instruction Dinâmica: Gemini 4 Argon ativo no servidor
             </span>
 
             <button
@@ -259,10 +245,10 @@ export const PromptEngineeringLab: React.FC = () => {
               <span className="text-xs font-semibold text-slate-300 block mb-2">
                 Resposta Retornada pelo Modelo:
               </span>
-              <div 
+              <div
                 className="bg-slate-950 border border-slate-800 rounded-xl p-4 markdown-content max-w-full overflow-x-auto"
                 dangerouslySetInnerHTML={{
-                  __html: marked.parse(playgroundOutput, { breaks: true, gfm: true }) as string,
+                  __html: renderSafeMarkdown(playgroundOutput),
                 }}
               />
             </div>
