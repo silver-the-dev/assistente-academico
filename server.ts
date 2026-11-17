@@ -223,6 +223,10 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // O app roda atrás do proxy do AI Studio / Cloud Run: confiar no primeiro proxy
+  // para que o rate limit use o IP real de cada usuário (evita ERR_ERL_FORWARDED_HEADER).
+  app.set('trust proxy', 1);
+
   app.use(express.json({ limit: '25mb' }));
 
   const aiRateLimiter = rateLimit({
