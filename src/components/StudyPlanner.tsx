@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Clock, 
   BookOpen, 
   Sparkles, 
   CheckCircle2, 
-  Share2, 
   Download, 
   Copy, 
   Check, 
@@ -15,7 +14,7 @@ import {
   ListChecks
 } from 'lucide-react';
 import { marked } from 'marked';
-import { SUBJECTS, INITIAL_EXAMS } from '../data/fsgData';
+import { SUBJECTS } from '../data/fsgData';
 import { createGoogleCalendarUrl, downloadIcsFile } from '../utils/calendarUtils';
 import { ExamEvent } from '../types/academic';
 
@@ -40,6 +39,11 @@ export const StudyPlanner: React.FC<StudyPlannerProps> = ({
   const [loading, setLoading] = useState(false);
   const [planResult, setPlanResult] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (initialSubject) setSelectedSubject(initialSubject);
+    if (initialDate) setExamDate(initialDate);
+  }, [initialSubject, initialDate]);
 
   // Quick preset exam scenarios
   const examPresets = [
@@ -95,7 +99,7 @@ export const StudyPlanner: React.FC<StudyPlannerProps> = ({
       setPlanResult(data.plan);
     } catch (err: any) {
       console.error(err);
-      setPlanResult(`### ⚠️ Erro ao gerar plano\nNão foi possível conectar ao modelo Gemini. Detalhes: ${err.message}`);
+      setPlanResult(`### Erro ao gerar plano\nNão foi possível conectar ao modelo Gemini. Detalhes: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -103,7 +107,6 @@ export const StudyPlanner: React.FC<StudyPlannerProps> = ({
 
   const currentSubjectObj = SUBJECTS.find((s) => s.name === selectedSubject) || SUBJECTS[0];
 
-  // Mock exam object for calendar link
   const currentExamObj: ExamEvent = {
     id: `custom-plan-${Date.now()}`,
     title: `Prova de ${selectedSubject}`,
@@ -125,50 +128,58 @@ export const StudyPlanner: React.FC<StudyPlannerProps> = ({
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="max-w-6xl w-full mx-auto px-3 sm:px-6 py-5 sm:py-6">
       {/* Page Title */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-1">
-          <Calendar className="h-4 w-4" />
+      <div className="mb-5">
+        <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-wide mb-1">
+          <Calendar className="h-4 w-4 shrink-0" />
           <span>Planejador Acadêmico de ADS</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
           Cronograma de Estudos em Tabela
         </h1>
-        <p className="text-sm text-slate-400 mt-1 max-w-3xl">
-          Informe a disciplina e a data da sua prova. O agente do AI Studio calcula os dias restantes, distribui a ementa da FSG e monta uma tabela com metas diárias e exercícios práticos.
+        <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
+          Informe a disciplina e a data da sua prova. O agente calcula os dias restantes, distribui a ementa da FSG e monta uma tabela com metas diárias e exercícios práticos.
         </p>
       </div>
 
       {/* Preset Quick Buttons */}
-      <div className="mb-6 bg-slate-900/60 border border-slate-800 rounded-xl p-3.5">
-        <span className="text-xs font-medium text-slate-400 block mb-2">
-          ⚡ Atalhos de provas do semestre na FSG:
+      <div className="mb-6 bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4">
+        <span className="text-xs font-medium text-slate-400 block mb-2.5">
+          Atalhos de provas do semestre na FSG:
         </span>
         <div className="flex flex-wrap gap-2">
-          {examPresets.map((preset, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                setSelectedSubject(preset.subject);
-                setExamDate(preset.date);
-                setDifficulties(preset.difficulty);
-              }}
-              className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600/30 hover:border-indigo-500/50 border border-slate-700 text-slate-200 transition flex items-center gap-1.5"
-            >
-              <Flame className="h-3.5 w-3.5 text-amber-400" />
-              <span>{preset.label}</span>
-            </button>
-          ))}
+          {examPresets.map((preset, idx) => {
+            const isSelected = selectedSubject === preset.subject && examDate === preset.date;
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  setSelectedSubject(preset.subject);
+                  setExamDate(preset.date);
+                  setDifficulties(preset.difficulty);
+                }}
+                className={`text-xs px-3 py-2 rounded-xl border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                  isSelected
+                    ? 'bg-indigo-600/20 border-indigo-500 text-white font-medium'
+                    : 'bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300'
+                }`}
+              >
+                <Flame className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                <span>{preset.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Input Configuration Panel (5 cols) */}
-        <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-          <h2 className="text-base font-semibold text-white flex items-center gap-2 pb-2 border-b border-slate-800">
-            <BookOpen className="h-4 w-4 text-indigo-400" />
-            Parâmetros do Seu Estudo
+        <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
+          <h2 className="text-sm sm:text-base font-semibold text-white flex items-center gap-2 pb-2.5 border-b border-slate-800">
+            <BookOpen className="h-4 w-4 text-indigo-400 shrink-0" />
+            <span>Parâmetros do Seu Estudo</span>
           </h2>
 
           {/* Subject Select */}
@@ -179,7 +190,7 @@ export const StudyPlanner: React.FC<StudyPlannerProps> = ({
             <select
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
             >
               {SUBJECTS.map((s) => (
                 <option key={s.id} value={s.name}>
@@ -187,34 +198,48 @@ export const StudyPlanner: React.FC<StudyPlannerProps> = ({
                 </option>
               ))}
             </select>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Responsável pelo material: <strong className="text-slate-300">{currentSubjectObj.responsible}</strong>
+            <p className="text-[11px] text-slate-400 mt-1.5">
+              Curadoria da disciplina: <strong className="text-slate-300">{currentSubjectObj.responsible}</strong> · Carga: <span className="font-mono tabular-nums">{currentSubjectObj.workload}</span>
             </p>
           </div>
 
-          {/* Exam Date */}
-          <div>
-            <label className="text-xs font-medium text-slate-300 block mb-1.5">
-              Data da Prova ou Entrega
-            </label>
-            <input
-              type="date"
-              value={examDate}
-              onChange={(e) => setExamDate(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
-            />
-            <p className="text-[11px] text-amber-400/90 mt-1">
-              * O agente não inventa datas; usa estritamente a data definida por você.
-            </p>
+          {/* Exam Date & Level */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1.5">
+                Data da Prova ou Entrega
+              </label>
+              <input
+                type="date"
+                value={examDate}
+                onChange={(e) => setExamDate(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white font-mono tabular-nums focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1.5">
+                Nível Atual na Matéria
+              </label>
+              <select
+                value={currentLevel}
+                onChange={(e) => setCurrentLevel(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+              >
+                <option value="Iniciante">Iniciante (Do zero)</option>
+                <option value="Intermediário">Intermediário (Revisão)</option>
+                <option value="Avançado">Avançado (Prática intensiva)</option>
+              </select>
+            </div>
           </div>
 
           {/* Hours per day */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
               <label className="text-xs font-medium text-slate-300">
-                Horas diárias de estudo dedicadas
+                Horas diárias dedicadas
               </label>
-              <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">
+              <span className="text-xs font-mono tabular-nums font-bold text-indigo-400">
                 {hoursPerDay}h / dia
               </span>
             </div>
@@ -227,9 +252,9 @@ export const StudyPlanner: React.FC<StudyPlannerProps> = ({
               onChange={(e) => setHoursPerDay(parseFloat(e.target.value))}
               className="w-full accent-indigo-500 cursor-pointer"
             />
-            <div className="flex justify-between text-[10px] text-slate-400 px-1">
+            <div className="flex justify-between text-[10px] text-slate-400 px-0.5 font-mono tabular-nums">
               <span>1h (Rápido)</span>
-              <span>2h (Recomendado)</span>
+              <span>2h (Ideal)</span>
               <span>4h+ (Intensivo)</span>
             </div>
           </div>
@@ -244,24 +269,25 @@ export const StudyPlanner: React.FC<StudyPlannerProps> = ({
               value={difficulties}
               onChange={(e) => setDifficulties(e.target.value)}
               placeholder="Ex: Não entendi direito a 3FN, tenho dificuldade com subqueries e transações..."
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
             />
           </div>
 
           {/* Generate Button */}
           <button
+            type="button"
             onClick={handleGeneratePlan}
             disabled={loading}
-            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             {loading ? (
               <>
-                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Montando tabela no AI Studio...</span>
+                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                <span>Montando cronograma em tabela...</span>
               </>
             ) : (
               <>
-                <Sparkles className="h-4 w-4 text-cyan-300" />
+                <Sparkles className="h-4 w-4 text-indigo-200 shrink-0" />
                 <span>Gerar Cronograma em Tabela</span>
               </>
             )}
@@ -269,13 +295,13 @@ export const StudyPlanner: React.FC<StudyPlannerProps> = ({
         </div>
 
         {/* Results Area (7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 min-w-0">
           {planResult ? (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
               {/* Header Actions */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 border-b border-slate-800">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                  <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
                   <span className="font-semibold text-white text-sm">
                     Plano Personalizado Concluído
                   </span>
@@ -283,8 +309,9 @@ export const StudyPlanner: React.FC<StudyPlannerProps> = ({
 
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={handleCopyMarkdown}
-                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs flex items-center gap-1.5 transition"
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                     title="Copiar markdown"
                   >
                     {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
@@ -295,63 +322,66 @@ export const StudyPlanner: React.FC<StudyPlannerProps> = ({
                     href={createGoogleCalendarUrl(currentExamObj)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm transition"
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors"
                   >
-                    <Calendar className="h-3.5 w-3.5" />
+                    <Calendar className="h-3.5 w-3.5 shrink-0" />
                     <span>Google Agenda</span>
-                    <ExternalLink className="h-3 w-3" />
+                    <ExternalLink className="h-3 w-3 shrink-0" />
                   </a>
                 </div>
               </div>
 
               {/* Rendered Markdown with enhanced table styling */}
               <div 
-                className="mt-4 prose prose-invert prose-sm max-w-none prose-table:border prose-table:border-slate-800 prose-th:bg-slate-800/80 prose-th:text-indigo-300 prose-th:p-2.5 prose-td:p-2.5 prose-td:border-b prose-td:border-slate-800 leading-relaxed overflow-x-auto"
+                className="mt-4 markdown-content max-w-full overflow-x-auto"
                 dangerouslySetInnerHTML={{
                   __html: marked.parse(planResult, { breaks: true, gfm: true }) as string,
                 }}
               />
 
               {/* Next Steps Buttons */}
-              <div className="mt-6 pt-4 border-t border-slate-800/80 flex flex-wrap gap-2.5">
+              <div className="mt-6 pt-4 border-t border-slate-800 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5">
                 <button
+                  type="button"
                   onClick={() => onNavigateToQuiz(selectedSubject)}
-                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1.5 border border-slate-700 transition"
+                  className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 text-xs font-medium flex items-center justify-center gap-1.5 border border-slate-800 transition-colors cursor-pointer"
                 >
-                  <ListChecks className="h-4 w-4 text-indigo-400" />
+                  <ListChecks className="h-4 w-4 text-indigo-400 shrink-0" />
                   <span>Fazer Simulado desta Matéria</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => downloadIcsFile([currentExamObj])}
-                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1.5 border border-slate-700 transition"
+                  className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 text-xs font-medium flex items-center justify-center gap-1.5 border border-slate-800 transition-colors cursor-pointer"
                 >
-                  <Download className="h-4 w-4 text-emerald-400" />
+                  <Download className="h-4 w-4 text-emerald-400 shrink-0" />
                   <span>Baixar Arquivo .ICS</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={onNavigateToCalendar}
-                  className="px-3 py-2 rounded-lg bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-800/50 text-xs font-medium flex items-center gap-1.5 transition ml-auto"
+                  className="px-3.5 py-2 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/50 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors sm:ml-auto cursor-pointer"
                 >
                   <span>Ver Todos os Lembretes</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0" />
                 </button>
               </div>
             </div>
           ) : (
-            <div className="bg-slate-900/50 border border-slate-800 border-dashed rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[380px]">
-              <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3">
-                <Calendar className="h-7 w-7" />
+            <div className="bg-slate-900/50 border border-slate-800 border-dashed rounded-2xl p-6 sm:p-10 text-center flex flex-col items-center justify-center min-h-[340px] sm:min-h-[420px]">
+              <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3">
+                <Calendar className="h-6 w-6" />
               </div>
               <h3 className="text-base font-semibold text-white">
                 Seu cronograma em tabela aparecerá aqui
               </h3>
-              <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                Selecione sua matéria e a data no painel ao lado para o agente de IA calcular a distribuição ideal de matérias e métodos de revisão ativa.
+              <p className="text-xs text-slate-400 mt-1.5 max-w-md leading-relaxed">
+                Selecione sua matéria e a data da avaliação no painel ao lado para calcular a distribuição ideal de tópicos da ementa e métodos de revisão ativa.
               </p>
-              <div className="mt-4 flex items-center gap-2 text-xs text-indigo-400/80 font-medium bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
-                <Clock className="h-3.5 w-3.5" />
+              <div className="mt-4 flex items-center gap-2 text-xs text-slate-300 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+                <Clock className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
                 <span>Baseado na ementa oficial das 15 matérias de ADS</span>
               </div>
             </div>

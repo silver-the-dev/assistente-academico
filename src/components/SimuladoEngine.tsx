@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CheckSquare, 
   HelpCircle, 
@@ -10,8 +10,8 @@ import {
   Code, 
   ChevronRight, 
   ChevronLeft,
-  BookOpen,
-  Filter
+  AlertCircle,
+  X
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Quiz, QuizQuestion } from '../types/academic';
@@ -39,26 +39,30 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
   const [generatorDifficulty, setGeneratorDifficulty] = useState('médio');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showGeneratorModal, setShowGeneratorModal] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialSubject) {
+      setGeneratorSubject(initialSubject);
+    }
+  }, [initialSubject]);
 
   const currentQ: QuizQuestion | undefined = currentQuiz.questions[currentQuestionIdx];
 
   const handleSelectOption = (questionId: number, key: string) => {
     if (isFinished) return;
     setSelectedAnswers((prev) => ({ ...prev, [questionId]: key }));
-    // Auto show explanation for immediate feedback
     setShowExplanations((prev) => ({ ...prev, [questionId]: true }));
   };
 
   const handleFinishQuiz = () => {
     setIsFinished(true);
-    // Reveal all explanations
     const allExplanations: Record<number, boolean> = {};
     currentQuiz.questions.forEach((q) => {
       allExplanations[q.id] = true;
     });
     setShowExplanations(allExplanations);
 
-    // Calculate score
     let correct = 0;
     currentQuiz.questions.forEach((q) => {
       if (selectedAnswers[q.id] === q.correctAnswer) {
@@ -86,6 +90,7 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
   const handleGenerateAiQuiz = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
+    setErrorMsg(null);
 
     try {
       const response = await fetch('/api/quiz', {
@@ -100,7 +105,7 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error('Falha ao gerar simulado com IA');
+        throw new Error('Falha ao gerar simulado com IA no servidor.');
       }
 
       const newQuiz: Quiz = await response.json();
@@ -108,10 +113,12 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
         setCurrentQuiz(newQuiz);
         handleResetQuiz();
         setShowGeneratorModal(false);
+      } else {
+        throw new Error('O formato retornado pelo modelo não continha questões válidas.');
       }
     } catch (err: any) {
       console.error(err);
-      alert('Erro ao gerar simulado: ' + err.message);
+      setErrorMsg(err.message || 'Erro ao gerar simulado. Tente novamente.');
     } finally {
       setIsGenerating(false);
     }
@@ -125,34 +132,39 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
   const scorePercent = Math.round((correctCount / currentQuiz.questions.length) * 100);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="max-w-5xl w-full mx-auto px-3 sm:px-6 py-5 sm:py-6">
       {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div>
-          <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-1">
-            <CheckSquare className="h-4 w-4" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-wide mb-1">
+            <CheckSquare className="h-4 w-4 shrink-0" />
             <span>Simulados & Gabarito Comentado</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight break-words">
             {currentQuiz.title}
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Disciplina: <span className="text-indigo-300 font-medium">{currentQuiz.subject}</span> · {currentQuiz.questions.length} questões
+            Disciplina: <span className="text-indigo-300 font-medium">{currentQuiz.subject}</span> · <span className="font-mono tabular-nums">{currentQuiz.questions.length}</span> questões
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={() => setShowGeneratorModal(true)}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition cursor-pointer"
+            type="button"
+            onClick={() => {
+              setErrorMsg(null);
+              setShowGeneratorModal(true);
+            }}
+            className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
-            <Sparkles className="h-4 w-4 text-cyan-300" />
+            <Sparkles className="h-4 w-4 text-indigo-200 shrink-0" />
             <span>Gerar Novo com IA</span>
           </button>
 
           <button
+            type="button"
             onClick={handleResetQuiz}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+            className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors shrink-0 cursor-pointer"
             title="Reiniciar Simulado"
           >
             <RotateCcw className="h-4 w-4" />
@@ -161,15 +173,15 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
       </div>
 
       {/* Progress & Summary Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 mb-6 shadow-md flex flex-wrap items-center justify-between gap-4">
-        {/* Question selector dots */}
-        <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Question selector buttons */}
+        <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar">
           {currentQuiz.questions.map((q, idx) => {
             const isAnswered = selectedAnswers[q.id] !== undefined;
             const isCorrect = selectedAnswers[q.id] === q.correctAnswer;
             const isCurrent = idx === currentQuestionIdx;
 
-            let dotColor = 'bg-slate-800 text-slate-400 border-slate-700';
+            let dotColor = 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700';
             if (isAnswered) {
               dotColor = isCorrect
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
@@ -182,8 +194,9 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
             return (
               <button
                 key={q.id}
+                type="button"
                 onClick={() => setCurrentQuestionIdx(idx)}
-                className={`h-7 w-7 rounded-lg text-xs font-semibold flex items-center justify-center border transition ${dotColor}`}
+                className={`h-8 w-8 rounded-lg text-xs font-mono tabular-nums font-semibold flex items-center justify-center border shrink-0 transition-colors cursor-pointer ${dotColor}`}
               >
                 {idx + 1}
               </button>
@@ -191,14 +204,14 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
           })}
         </div>
 
-        {/* Live score tag */}
-        <div className="flex items-center gap-3 text-xs">
+        {/* Live score summary */}
+        <div className="flex items-center justify-between sm:justify-end gap-3 text-xs font-mono tabular-nums pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80">
           <span className="text-slate-400">
-            Respondidas: <strong className="text-white">{answeredCount}</strong> / {currentQuiz.questions.length}
+            Respondidas: <strong className="text-white">{answeredCount}</strong>/{currentQuiz.questions.length}
           </span>
           {answeredCount > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-indigo-300 border border-slate-700 font-semibold">
-              Acertos: {correctCount} ({scorePercent}%)
+            <span className="text-indigo-300 font-semibold">
+              · Acertos: {correctCount} ({scorePercent}%)
             </span>
           )}
         </div>
@@ -206,28 +219,28 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
 
       {/* Question Card */}
       {currentQ && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl mb-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 mb-6">
           {/* Question Header */}
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pb-2 border-b border-slate-800">
-            <span className="font-semibold text-indigo-400 uppercase tracking-wide">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pb-2.5 border-b border-slate-800 font-mono tabular-nums">
+            <span className="font-sans font-semibold text-indigo-400">
               Questão {currentQuestionIdx + 1} de {currentQuiz.questions.length}
             </span>
-            <span>ID #{currentQ.id}</span>
+            <span>#{currentQ.id}</span>
           </div>
 
           {/* Enunciado */}
-          <h2 className="text-base sm:text-lg font-medium text-white leading-relaxed mb-4">
+          <h2 className="text-sm sm:text-lg font-semibold text-white leading-relaxed mb-4">
             {currentQ.question}
           </h2>
 
           {/* Code snippet if present */}
           {currentQ.codeSnippet && (
-            <div className="mb-4 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-cyan-300 overflow-x-auto shadow-inner">
-              <div className="flex items-center gap-1.5 text-slate-400 text-[10px] mb-1.5 pb-1 border-b border-slate-850">
-                <Code className="h-3 w-3" />
+            <div className="mb-4 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-cyan-300 overflow-x-auto">
+              <div className="flex items-center gap-1.5 text-slate-400 text-[11px] mb-2 pb-1.5 border-b border-slate-800">
+                <Code className="h-3.5 w-3.5 shrink-0" />
                 <span>Código Contextual</span>
               </div>
-              <pre>{currentQ.codeSnippet}</pre>
+              <pre className="leading-relaxed">{currentQ.codeSnippet}</pre>
             </div>
           )}
 
@@ -238,45 +251,46 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
               const hasAnswered = selectedAnswers[currentQ.id] !== undefined;
               const isCorrectOption = currentQ.correctAnswer === option.key;
 
-              let style = 'bg-slate-950/70 border-slate-800 text-slate-200 hover:border-slate-700 hover:bg-slate-850';
+              let style = 'bg-slate-950/80 border-slate-800 text-slate-200 hover:border-slate-700 hover:bg-slate-950';
 
               if (hasAnswered) {
                 if (isCorrectOption) {
-                  style = 'bg-emerald-950/40 border-emerald-500/60 text-emerald-200 shadow-sm';
+                  style = 'bg-emerald-950/40 border-emerald-500/60 text-emerald-100';
                 } else if (isSelected && !isCorrectOption) {
-                  style = 'bg-rose-950/40 border-rose-500/60 text-rose-200 shadow-sm';
+                  style = 'bg-rose-950/40 border-rose-500/60 text-rose-100';
                 } else {
-                  style = 'bg-slate-950/40 border-slate-850 text-slate-400 opacity-60';
+                  style = 'bg-slate-950/40 border-slate-800/60 text-slate-400 opacity-65';
                 }
               } else if (isSelected) {
-                style = 'bg-indigo-900/30 border-indigo-500 text-white';
+                style = 'bg-indigo-950/50 border-indigo-500 text-white';
               }
 
               return (
                 <button
                   key={option.key}
+                  type="button"
                   onClick={() => handleSelectOption(currentQ.id, option.key)}
-                  className={`w-full text-left p-3.5 rounded-xl border text-sm transition flex items-start gap-3 cursor-pointer ${style}`}
+                  className={`w-full text-left p-3 sm:p-3.5 rounded-xl border text-xs sm:text-sm transition-colors flex items-start gap-3 cursor-pointer ${style}`}
                 >
                   <span
-                    className={`h-6 w-6 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 mt-0.5 border ${
+                    className={`h-6 w-6 rounded-lg text-xs font-mono font-bold flex items-center justify-center shrink-0 mt-0.5 border ${
                       hasAnswered && isCorrectOption
                         ? 'bg-emerald-500 text-white border-emerald-400'
                         : hasAnswered && isSelected && !isCorrectOption
                         ? 'bg-rose-500 text-white border-rose-400'
                         : isSelected
                         ? 'bg-indigo-600 text-white border-indigo-500'
-                        : 'bg-slate-800 text-slate-300 border-slate-700'
+                        : 'bg-slate-900 text-slate-300 border-slate-700'
                     }`}
                   >
                     {option.key}
                   </span>
-                  <span className="flex-1 leading-relaxed">{option.text}</span>
+                  <span className="flex-1 leading-relaxed break-words">{option.text}</span>
                   {hasAnswered && isCorrectOption && (
-                    <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
+                    <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
                   )}
                   {hasAnswered && isSelected && !isCorrectOption && (
-                    <XCircle className="h-5 w-5 text-rose-400 shrink-0" />
+                    <XCircle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
                   )}
                 </button>
               );
@@ -285,9 +299,9 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
 
           {/* Commented Answer Key (Gabarito Comentado) */}
           {showExplanations[currentQ.id] && (
-            <div className="bg-slate-950 border border-indigo-500/30 rounded-xl p-4 mb-4 text-xs shadow-inner">
+            <div className="bg-slate-950 border border-indigo-500/30 rounded-xl p-4 mb-5 text-xs">
               <div className="flex items-center gap-2 font-semibold text-indigo-300 mb-1.5">
-                <HelpCircle className="h-4 w-4 text-indigo-400" />
+                <HelpCircle className="h-4 w-4 text-indigo-400 shrink-0" />
                 <span>Gabarito Comentado · Alternativa Correta: ({currentQ.correctAnswer})</span>
               </div>
               <p className="text-slate-300 leading-relaxed">
@@ -297,30 +311,33 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
           )}
 
           {/* Nav Buttons */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-800">
             <button
+              type="button"
               onClick={() => setCurrentQuestionIdx((p) => Math.max(0, p - 1))}
               disabled={currentQuestionIdx === 0}
-              className="px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 border border-slate-700 flex items-center gap-1 transition"
+              className="px-3.5 py-2 rounded-xl text-xs font-medium bg-slate-950 hover:bg-slate-800 disabled:opacity-40 text-slate-300 border border-slate-800 flex items-center gap-1 transition-colors cursor-pointer"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4 shrink-0" />
               <span>Anterior</span>
             </button>
 
             {currentQuestionIdx < currentQuiz.questions.length - 1 ? (
               <button
+                type="button"
                 onClick={() => setCurrentQuestionIdx((p) => p + 1)}
-                className="px-4 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1 shadow-sm transition"
+                className="px-4 py-2 rounded-xl text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <span>Próxima</span>
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4 shrink-0" />
               </button>
             ) : (
               <button
+                type="button"
                 onClick={handleFinishQuiz}
-                className="px-4 py-1.5 rounded-lg text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1 shadow-sm transition"
+                className="px-4 py-2 rounded-xl text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                <Award className="h-4 w-4" />
+                <Award className="h-4 w-4 shrink-0" />
                 <span>Finalizar Simulado</span>
               </button>
             )}
@@ -328,29 +345,31 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
         </div>
       )}
 
-      {/* Score Modal / Card when Finished */}
+      {/* Score Card when Finished */}
       {isFinished && (
-        <div className="bg-gradient-to-br from-indigo-950/60 to-slate-900 border border-indigo-500/40 rounded-2xl p-6 shadow-2xl text-center mb-6">
-          <div className="h-16 w-16 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 mx-auto mb-3">
-            <Award className="h-8 w-8" />
+        <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl p-6 text-center mb-6">
+          <div className="h-14 w-14 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 mx-auto mb-3">
+            <Award className="h-7 w-7" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-1">
+          <h3 className="text-lg sm:text-xl font-bold text-white mb-1">
             Resultado do Simulado
           </h3>
-          <p className="text-xs text-slate-400 mb-4">
+          <p className="text-xs sm:text-sm text-slate-300 mb-5 font-mono tabular-nums">
             Você acertou <strong className="text-emerald-400 text-base">{correctCount}</strong> de {currentQuiz.questions.length} questões ({scorePercent}%)
           </p>
 
-          <div className="flex flex-wrap justify-center gap-3">
+          <div className="flex flex-col sm:flex-row justify-center gap-2.5">
             <button
+              type="button"
               onClick={handleResetQuiz}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+              className="px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-800 transition-colors cursor-pointer"
             >
               Tentar Novamente
             </button>
             <button
+              type="button"
               onClick={() => onNavigateToPlanner(currentQuiz.subject)}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition"
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors cursor-pointer"
             >
               Montar Cronograma para Esta Matéria
             </button>
@@ -361,24 +380,40 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
       {/* Modal Generator with AI */}
       {showGeneratorModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl relative">
-            <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-indigo-400" />
-              Gerar Simulado Personalizado com IA
-            </h3>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 max-w-lg w-full max-h-[90dvh] overflow-y-auto shadow-2xl">
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-indigo-400 shrink-0" />
+                <span>Gerar Simulado com IA</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowGeneratorModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
             <p className="text-xs text-slate-400 mb-4">
               O modelo Gemini criará questões inéditas contextualizadas com os tópicos da ementa de ADS da FSG.
             </p>
 
+            {errorMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-xs text-rose-200 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
             <form onSubmit={handleGenerateAiQuiz} className="space-y-4">
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
+                <label className="text-xs font-medium text-slate-300 block mb-1.5">
                   Disciplina de ADS
                 </label>
                 <select
                   value={generatorSubject}
                   onChange={(e) => setGeneratorSubject(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
                 >
                   {SUBJECTS.map((s) => (
                     <option key={s.id} value={s.name}>
@@ -389,7 +424,7 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
+                <label className="text-xs font-medium text-slate-300 block mb-1.5">
                   Tópico específico (opcional)
                 </label>
                 <input
@@ -397,19 +432,19 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
                   value={generatorTopic}
                   onChange={(e) => setGeneratorTopic(e.target.value)}
                   placeholder="Ex: Normalização 3FN, JOINs, Polimorfismo, Dockerfile..."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-300 block mb-1">
+                  <label className="text-xs font-medium text-slate-300 block mb-1.5">
                     Número de Questões
                   </label>
                   <select
                     value={generatorCount}
                     onChange={(e) => setGeneratorCount(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value={3}>3 Questões (Rápido)</option>
                     <option value={5}>5 Questões (Padrão)</option>
@@ -418,13 +453,13 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-slate-300 block mb-1">
+                  <label className="text-xs font-medium text-slate-300 block mb-1.5">
                     Dificuldade
                   </label>
                   <select
                     value={generatorDifficulty}
                     onChange={(e) => setGeneratorDifficulty(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="fácil">Fácil (Conceitual)</option>
                     <option value="médio">Médio (Padrão FSG)</option>
@@ -433,27 +468,27 @@ export const SimuladoEngine: React.FC<SimuladoEngineProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowGeneratorModal(false)}
-                  className="px-3.5 py-2 rounded-xl text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                  className="px-4 py-2 rounded-xl text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isGenerating}
-                  className="px-4 py-2 rounded-xl text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold flex items-center gap-1.5 shadow-md transition"
+                  className="px-4 py-2 rounded-xl text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   {isGenerating ? (
                     <>
-                      <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
                       <span>Gerando Simulado...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
+                      <Sparkles className="h-3.5 w-3.5 text-indigo-200 shrink-0" />
                       <span>Gerar Simulado</span>
                     </>
                   )}

@@ -17,7 +17,7 @@ export default function App() {
     try {
       const saved = localStorage.getItem('fsg_ads_exams');
       if (saved) return JSON.parse(saved);
-    } catch (e) {
+    } catch {
       // fallback
     }
     return INITIAL_EXAMS;
@@ -27,11 +27,12 @@ export default function App() {
   const [plannerSubject, setPlannerSubject] = useState('Modelagem e Banco de Dados Relacional');
   const [plannerDate, setPlannerDate] = useState('2026-11-20');
   const [quizSubject, setQuizSubject] = useState('Modelagem e Banco de Dados Relacional');
+  const [pendingChatPrompt, setPendingChatPrompt] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       localStorage.setItem('fsg_ads_exams', JSON.stringify(exams));
-    } catch (e) {
+    } catch {
       // fallback
     }
   }, [exams]);
@@ -44,24 +45,37 @@ export default function App() {
     setPlannerSubject(subject);
     setPlannerDate(date);
     setActiveTab('planner');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleOpenQuiz = (subject: string) => {
     setQuizSubject(subject);
     setActiveTab('quiz');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenChatWithPrompt = (promptText: string) => {
+    setPendingChatPrompt(promptText);
+    setActiveTab('chat');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-600/30 selection:text-indigo-200">
+    <div className="min-h-dvh bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-600/30 selection:text-indigo-200 overflow-x-hidden">
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         examCount={exams.length}
       />
 
-      <main className="flex-1">
+      <main className="flex-1 w-full flex flex-col">
         {activeTab === 'chat' && (
           <ChatTutor
+            initialPrompt={pendingChatPrompt}
+            onClearInitialPrompt={() => setPendingChatPrompt(null)}
             onOpenPlannerWithParams={handleOpenPlanner}
             onOpenSimuladoWithSubject={handleOpenQuiz}
             onNavigateToCalendar={() => setActiveTab('calendar')}
@@ -96,9 +110,7 @@ export default function App() {
 
         {activeTab === 'subjects' && (
           <KnowledgeBase
-            onSelectSubjectForChat={(prompt) => {
-              setActiveTab('chat');
-            }}
+            onSelectSubjectForChat={handleOpenChatWithPrompt}
             onSelectSubjectForPlanner={(subject) => handleOpenPlanner(subject, '2026-11-20')}
             onSelectSubjectForQuiz={handleOpenQuiz}
           />
@@ -110,10 +122,10 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 py-4 px-4 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <footer className="border-t border-slate-900 bg-slate-950/90 py-4 px-4 text-xs text-slate-400 print:hidden">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
           <p>
-            <strong className="text-slate-400">Agente Acadêmico ADS · FSG</strong> — Projeto desenvolvido no Google AI Studio
+            <strong className="text-slate-300">Agente Acadêmico ADS · FSG</strong> — Assistente de Estudos e Cronogramas
           </p>
           <p className="text-slate-400">
             Davi Chidem · Guilherme Matte · João

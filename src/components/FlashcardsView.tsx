@@ -9,8 +9,7 @@ import {
   ChevronRight, 
   ChevronLeft,
   Filter,
-  PlusCircle,
-  BookOpen
+  AlertCircle
 } from 'lucide-react';
 import { Flashcard } from '../types/academic';
 import { INITIAL_FLASHCARDS, SUBJECTS } from '../data/fsgData';
@@ -28,6 +27,7 @@ export const FlashcardsView: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [genSubject, setGenSubject] = useState(SUBJECTS[0].name);
   const [showGenModal, setShowGenModal] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const filteredCards = selectedSubjectFilter === 'all'
     ? cards
@@ -36,7 +36,7 @@ export const FlashcardsView: React.FC = () => {
   const currentCard: Flashcard | undefined = filteredCards[currentIndex];
 
   const handleFlip = () => {
-    setIsFlipped(!isFlipped);
+    setIsFlipped((prev) => !prev);
   };
 
   const handleNext = () => {
@@ -74,6 +74,7 @@ export const FlashcardsView: React.FC = () => {
   const handleGenerateCards = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
+    setErrorMsg(null);
 
     try {
       const res = await fetch('/api/flashcards', {
@@ -82,7 +83,7 @@ export const FlashcardsView: React.FC = () => {
         body: JSON.stringify({ subject: genSubject, count: 6 }),
       });
 
-      if (!res.ok) throw new Error('Falha ao gerar flashcards');
+      if (!res.ok) throw new Error('Falha ao gerar flashcards no servidor.');
 
       const data = await res.json();
       const subjectObj = SUBJECTS.find((s) => s.name === genSubject);
@@ -96,26 +97,27 @@ export const FlashcardsView: React.FC = () => {
       }));
 
       setCards((prev) => [...newFlashcards, ...prev]);
+      setSelectedSubjectFilter('all');
       setShowGenModal(false);
       setCurrentIndex(0);
       setIsFlipped(false);
     } catch (err: any) {
-      alert('Erro ao gerar flashcards: ' + err.message);
+      setErrorMsg(err.message || 'Erro ao gerar flashcards.');
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="max-w-4xl w-full mx-auto px-3 sm:px-6 py-5 sm:py-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-1">
-            <Layers className="h-4 w-4" />
+          <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-wide mb-1">
+            <Layers className="h-4 w-4 shrink-0" />
             <span>Memorização Ativa & Revisão Espaçada</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
             Flashcards de ADS
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
@@ -124,18 +126,22 @@ export const FlashcardsView: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setShowGenModal(true)}
-          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition cursor-pointer"
+          type="button"
+          onClick={() => {
+            setErrorMsg(null);
+            setShowGenModal(true);
+          }}
+          className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shrink-0 cursor-pointer"
         >
-          <Sparkles className="h-4 w-4 text-cyan-300" />
+          <Sparkles className="h-4 w-4 text-indigo-200 shrink-0" />
           <span>Criar Flashcards com IA</span>
         </button>
       </div>
 
       {/* Filter and stats */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-slate-400" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 bg-slate-900 border border-slate-800 rounded-2xl p-3.5">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Filter className="h-4 w-4 text-slate-400 shrink-0" />
           <select
             value={selectedSubjectFilter}
             onChange={(e) => {
@@ -143,7 +149,7 @@ export const FlashcardsView: React.FC = () => {
               setCurrentIndex(0);
               setIsFlipped(false);
             }}
-            className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+            className="flex-1 sm:w-72 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 truncate cursor-pointer"
           >
             <option value="all">Todas as Disciplinas ({cards.length})</option>
             {SUBJECTS.map((s) => (
@@ -154,12 +160,12 @@ export const FlashcardsView: React.FC = () => {
           </select>
         </div>
 
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center justify-between sm:justify-end gap-4 text-xs font-mono tabular-nums pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80">
           <span className="text-emerald-400 flex items-center gap-1">
-            <Check className="h-3.5 w-3.5" /> Dominados: {masteredIds.size}
+            <Check className="h-3.5 w-3.5 shrink-0" /> Dominados: <strong>{masteredIds.size}</strong>
           </span>
           <span className="text-rose-400 flex items-center gap-1">
-            <X className="h-3.5 w-3.5" /> Revisar: {reviewIds.size}
+            <X className="h-3.5 w-3.5 shrink-0" /> Revisar: <strong>{reviewIds.size}</strong>
           </span>
         </div>
       </div>
@@ -167,107 +173,146 @@ export const FlashcardsView: React.FC = () => {
       {/* Main Flashcard Container */}
       {currentCard ? (
         <div className="flex flex-col items-center">
-          {/* Flip Card with 3D perspective */}
+          {/* 3D Flip Card with dedicated Front and Back faces (no mirrored text) */}
           <div
             onClick={handleFlip}
-            className="w-full max-w-xl min-h-[300px] sm:min-h-[340px] cursor-pointer group perspective select-none"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleFlip();
+              }
+            }}
+            className="w-full max-w-2xl cursor-pointer group perspective select-none focus:outline-none"
           >
             <div
-              className={`relative w-full h-full min-h-[300px] sm:min-h-[340px] rounded-3xl p-6 sm:p-8 transition-transform duration-500 preserve-3d shadow-2xl border flex flex-col justify-between ${
-                isFlipped
-                  ? 'bg-slate-900 border-indigo-500/50 shadow-indigo-500/10 rotate-y-180'
-                  : 'bg-slate-900/90 border-slate-800 hover:border-slate-700 shadow-slate-950/50'
+              className={`relative w-full min-h-[320px] sm:min-h-[360px] transition-transform duration-500 preserve-3d ${
+                isFlipped ? 'rotate-y-180' : ''
               }`}
             >
-              {/* Card Header */}
-              <div className="flex items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800">
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 font-medium text-indigo-300">
-                  {currentCard.category}
-                </span>
-                <span className="flex items-center gap-1 text-[11px]">
-                  <RotateCw className="h-3 w-3 text-slate-400 group-hover:rotate-180 transition-transform duration-500" />
-                  <span>Clique para virar ({currentIndex + 1} de {filteredCards.length})</span>
-                </span>
+              {/* FRONT FACE (Question / Concept) */}
+              <div className="absolute inset-0 w-full h-full rounded-3xl p-5 sm:p-8 bg-slate-900 border border-slate-800 group-hover:border-slate-700 shadow-2xl backface-hidden flex flex-col justify-between">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-2 text-xs text-slate-400 pb-3 border-b border-slate-800">
+                  <span className="font-medium text-indigo-300 truncate">
+                    {currentCard.category}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[11px] font-mono tabular-nums shrink-0">
+                    <RotateCw className="h-3.5 w-3.5 text-slate-400 group-hover:rotate-180 transition-transform duration-500" />
+                    <span>{currentIndex + 1} / {filteredCards.length}</span>
+                  </span>
+                </div>
+
+                {/* Center Question */}
+                <div className="my-auto py-4 overflow-y-auto custom-scrollbar">
+                  <span className="text-xs font-semibold text-indigo-400 block mb-2">
+                    Pergunta / Conceito
+                  </span>
+                  <h2 className="text-base sm:text-xl font-bold text-white leading-relaxed">
+                    {currentCard.front}
+                  </h2>
+                </div>
+
+                {/* Footer */}
+                <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs text-slate-400">
+                  {currentCard.hint ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowHint((prev) => !prev);
+                      }}
+                      className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 transition-colors text-left cursor-pointer"
+                    >
+                      <Lightbulb className="h-3.5 w-3.5 shrink-0" />
+                      <span className="line-clamp-1">{showHint ? currentCard.hint : 'Ver dica'}</span>
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+
+                  <span className="text-[11px] text-slate-400 shrink-0">
+                    Toque para ver a resposta
+                  </span>
+                </div>
               </div>
 
-              {/* Card Center Content */}
-              <div className="my-auto py-4">
-                {!isFlipped ? (
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400 block mb-2">
-                      Pergunta / Conceito
-                    </span>
-                    <h2 className="text-lg sm:text-xl font-semibold text-white leading-relaxed">
-                      {currentCard.front}
-                    </h2>
-                  </div>
-                ) : (
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 block mb-2">
-                      Resposta / Aplicação Prática
-                    </span>
-                    <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-normal">
-                      {currentCard.back}
-                    </p>
-                  </div>
-                )}
-              </div>
+              {/* BACK FACE (Answer / Practical Explanation — counter-rotated so text is never mirrored) */}
+              <div className="absolute inset-0 w-full h-full rounded-3xl p-5 sm:p-8 bg-slate-900 border border-indigo-500/50 shadow-2xl backface-hidden rotate-y-180 flex flex-col justify-between">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-2 text-xs text-slate-400 pb-3 border-b border-slate-800">
+                  <span className="font-medium text-emerald-400 truncate">
+                    {currentCard.category} · Resposta
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[11px] font-mono tabular-nums shrink-0">
+                    <RotateCw className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>{currentIndex + 1} / {filteredCards.length}</span>
+                  </span>
+                </div>
 
-              {/* Card Footer */}
-              <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                {currentCard.hint ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowHint(!showHint);
-                    }}
-                    className="flex items-center gap-1 text-amber-400/90 hover:text-amber-300 transition"
-                  >
-                    <Lightbulb className="h-3.5 w-3.5" />
-                    <span>{showHint ? currentCard.hint : 'Ver dica'}</span>
-                  </button>
-                ) : <span />}
+                {/* Center Answer */}
+                <div className="my-auto py-4 overflow-y-auto custom-scrollbar">
+                  <span className="text-xs font-semibold text-emerald-400 block mb-2">
+                    Explicação e Aplicação Prática
+                  </span>
+                  <p className="text-sm sm:text-base text-slate-100 leading-relaxed">
+                    {currentCard.back}
+                  </p>
+                </div>
 
-                <span className="text-[11px] text-slate-400">
-                  {isFlipped ? 'Verso do Cartão' : 'Anverso'}
-                </span>
+                {/* Footer */}
+                <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                  <span className="text-[11px] text-indigo-300">
+                    Avalie seu domínio abaixo
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    Toque para voltar à pergunta
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Action buttons under card */}
-          <div className="w-full max-w-xl flex items-center justify-between gap-3 mt-6">
+          {/* Action buttons under card — Responsive on mobile and desktop */}
+          <div className="w-full max-w-2xl grid grid-cols-2 sm:flex items-center justify-between gap-2.5 sm:gap-3 mt-6">
             <button
+              type="button"
               onClick={() => markReview(currentCard.id)}
-              className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-rose-950/40 text-rose-300 border border-slate-800 hover:border-rose-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              className="order-2 sm:order-1 sm:flex-1 py-3 px-4 rounded-xl bg-slate-900 hover:bg-rose-950/40 text-rose-300 border border-slate-800 hover:border-rose-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4 shrink-0" />
               <span>Preciso Revisar</span>
             </button>
 
-            <div className="flex items-center gap-1 px-2">
+            <div className="order-1 sm:order-2 col-span-2 sm:col-span-1 flex items-center justify-center gap-2">
               <button
+                type="button"
                 onClick={handlePrev}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                className="flex-1 sm:flex-initial h-10 px-4 sm:px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 flex items-center justify-center gap-1 text-xs font-medium transition-colors cursor-pointer"
                 title="Cartão anterior"
               >
                 <ChevronLeft className="h-4 w-4" />
+                <span className="sm:hidden">Anterior</span>
               </button>
               <button
+                type="button"
                 onClick={handleNext}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                className="flex-1 sm:flex-initial h-10 px-4 sm:px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 flex items-center justify-center gap-1 text-xs font-medium transition-colors cursor-pointer"
                 title="Próximo cartão"
               >
+                <span className="sm:hidden">Próximo</span>
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
 
             <button
+              type="button"
               onClick={() => markMastered(currentCard.id)}
-              className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-emerald-950/40 text-emerald-300 border border-slate-800 hover:border-emerald-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              className="order-3 sm:flex-1 py-3 px-4 rounded-xl bg-slate-900 hover:bg-emerald-950/40 text-emerald-300 border border-slate-800 hover:border-emerald-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Check className="h-4 w-4" />
-              <span>Acertei / Já Sei!</span>
+              <Check className="h-4 w-4 shrink-0" />
+              <span>Acertei / Já Sei</span>
             </button>
           </div>
         </div>
@@ -280,24 +325,40 @@ export const FlashcardsView: React.FC = () => {
       {/* Generator Modal */}
       {showGenModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-indigo-400" />
-              Gerar Flashcards com o Modelo Gemini
-            </h3>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-400 shrink-0" />
+                <span>Gerar Flashcards com IA</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowGenModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
             <p className="text-xs text-slate-400 mb-4">
               O assistente criará 6 flashcards conceituais focados em provas e entrevistas técnicas.
             </p>
 
+            {errorMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-xs text-rose-200 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
             <form onSubmit={handleGenerateCards} className="space-y-4">
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
+                <label className="text-xs font-medium text-slate-300 block mb-1.5">
                   Selecione a Disciplina de ADS
                 </label>
                 <select
                   value={genSubject}
                   onChange={(e) => setGenSubject(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
                 >
                   {SUBJECTS.map((s) => (
                     <option key={s.id} value={s.name}>
@@ -307,18 +368,18 @@ export const FlashcardsView: React.FC = () => {
                 </select>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowGenModal(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs bg-slate-800 text-slate-300"
+                  className="px-4 py-2 rounded-xl text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isGenerating}
-                  className="px-4 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   {isGenerating ? 'Gerando...' : 'Criar Cartões'}
                 </button>

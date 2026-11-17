@@ -6,14 +6,13 @@ import {
   Download, 
   Code, 
   Plus, 
-  CheckCircle2, 
   Clock, 
   MapPin, 
   AlertTriangle,
   Copy,
   Check,
-  Tag,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react';
 import { ExamEvent } from '../types/academic';
 import { 
@@ -50,7 +49,7 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
   const [newDescription, setNewDescription] = useState('');
 
   const calculateDaysLeft = (dateStr: string) => {
-    const today = new Date('2026-11-10'); // Reference local time from metadata
+    const today = new Date('2026-11-10');
     const [y, m, d] = dateStr.split('-').map(Number);
     const target = new Date(y, m - 1, d);
     const diffTime = target.getTime() - today.getTime();
@@ -93,70 +92,74 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="max-w-6xl w-full mx-auto px-3 sm:px-6 py-5 sm:py-6">
       {/* Title & Hub Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-1">
-            <Sparkles className="h-4 w-4" />
+          <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold tracking-wide mb-1">
+            <Sparkles className="h-4 w-4 shrink-0" />
             <span>Notificações & Lembretes</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
             Integração com Google Agenda
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl">
             Mantenha suas provas e entregas de ADS organizadas. Adicione com 1 clique, baixe arquivo .ICS ou automatize lembretes via Google Apps Script.
           </p>
         </div>
 
         {/* Global actions */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
+            type="button"
             onClick={() => downloadIcsFile(exams)}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition"
+            className="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer"
             title="Baixar todos os eventos no formato padrão iCalendar"
           >
-            <Download className="h-4 w-4 text-emerald-400" />
-            <span>Exportar .ICS Completo</span>
+            <Download className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span>Exportar .ICS</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setShowAppsScriptModal(true)}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition"
+            className="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer"
             title="Ver código Apps Script para sincronização direta"
           >
-            <Code className="h-4 w-4 text-cyan-400" />
-            <span>Script de Automação (.gs)</span>
+            <Code className="h-4 w-4 text-cyan-400 shrink-0" />
+            <span>Script (.gs)</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setShowAddModal(true)}
-            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4 shrink-0" />
             <span>Adicionar Prova / Trabalho</span>
           </button>
         </div>
       </div>
 
       {/* Info notice about rule: não inventar datas */}
-      <div className="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-3.5 mb-6 text-xs text-indigo-200 flex items-start gap-3">
+      <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-4 mb-6 text-xs text-slate-300 flex items-start gap-3">
         <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-        <div>
-          <strong className="text-white">Diretriz Pedagógica FSG:</strong> O Agente Acadêmico não inventa datas de provas. As avaliações listadas abaixo seguem o calendário oficial do semestre e as datas cadastradas por você. Sincronize com sua conta do Google para receber alertas no smartphone com 7 dias e 24h de antecedência.
+        <div className="leading-relaxed">
+          <strong className="text-white">Diretriz Pedagógica FSG:</strong> O Agente Acadêmico não inventa datas de provas. As avaliações listadas abaixo seguem o calendário oficial do semestre e as datas cadastradas por você. Sincronize com sua conta do Google para receber alertas com 7 dias e 24h de antecedência.
         </div>
       </div>
 
-      {/* Filter Chips */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        <span className="text-xs text-slate-400 font-medium mr-1">Filtrar por tipo:</span>
+      {/* Filter Bar */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-5 no-scrollbar">
+        <span className="text-xs text-slate-400 font-medium mr-1 shrink-0">Filtrar:</span>
         {['all', 'Prova A1', 'Prova A2', 'Projeto Integrador', 'Substitutiva'].map((type) => (
           <button
             key={type}
+            type="button"
             onClick={() => setFilterType(type)}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
               filterType === type
-                ? 'bg-indigo-600 text-white shadow-sm'
+                ? 'bg-indigo-600 text-white font-semibold'
                 : 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800'
             }`}
           >
@@ -174,26 +177,26 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
           return (
             <div
               key={event.id}
-              className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col justify-between transition group"
+              className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-colors group"
             >
               <div>
                 {/* Event header with type and countdown */}
-                <div className="flex items-start justify-between gap-2 mb-2.5">
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                <div className="flex items-center justify-between gap-2 mb-2 text-xs">
+                  <span className="font-semibold text-indigo-400">
                     {event.type}
                   </span>
 
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                    className={`font-mono tabular-nums font-semibold ${
                       daysLeft === 0
-                        ? 'bg-rose-500 text-white animate-pulse'
+                        ? 'text-rose-400'
                         : isUrgent
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'bg-slate-800 text-slate-300'
+                        ? 'text-amber-400'
+                        : 'text-slate-400'
                     }`}
                   >
                     {daysLeft === 0
-                      ? 'Hoje!'
+                      ? 'Hoje'
                       : daysLeft > 0
                       ? `Faltam ${daysLeft} dias`
                       : 'Realizada'}
@@ -201,17 +204,17 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
                 </div>
 
                 {/* Event Title */}
-                <h3 className="text-base font-bold text-white group-hover:text-indigo-300 transition">
+                <h3 className="text-base font-bold text-white group-hover:text-indigo-300 transition-colors">
                   {event.title}
                 </h3>
-                <p className="text-xs text-indigo-400 font-medium mt-0.5">
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
                   {event.subjectName}
                 </p>
 
                 {/* Meta details */}
-                <div className="space-y-1.5 mt-3 text-xs text-slate-300">
+                <div className="space-y-1.5 mt-3.5 text-xs text-slate-300">
                   <div className="flex items-center gap-2">
-                    <CalendarIcon className="h-3.5 w-3.5 text-indigo-400" />
+                    <CalendarIcon className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
                     <span>
                       {new Date(event.date + 'T12:00:00').toLocaleDateString('pt-BR', {
                         weekday: 'long',
@@ -221,36 +224,38 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
                       })}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                  <div className="flex items-center gap-2 font-mono tabular-nums">
+                    <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                     <span>{event.time}h · Peso: {event.weight}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                    <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                     <span className="truncate">{event.location}</span>
                   </div>
                 </div>
 
                 {/* Description */}
-                <p className="text-xs text-slate-400 mt-3 line-clamp-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-850">
+                <p className="text-xs text-slate-400 mt-3.5 line-clamp-2 bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 leading-relaxed">
                   {event.description}
                 </p>
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+              <div className="mt-4 pt-3.5 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
                 <button
+                  type="button"
                   onClick={() => onNavigateToPlannerWithExam(event.subjectName, event.date)}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium transition"
+                  className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
                 >
-                  <span>Gerar Plano</span>
-                  <ChevronRight className="h-3 w-3" />
+                  <span>Gerar Cronograma</span>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0" />
                 </button>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2 ml-auto">
                   <button
+                    type="button"
                     onClick={() => downloadIcsFile([event], `fsg-${event.id}.ics`)}
-                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs transition"
+                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs transition-colors cursor-pointer"
                     title="Baixar .ics deste evento"
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -260,10 +265,10 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
                     href={createGoogleCalendarUrl(event)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition"
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap"
                   >
-                    <span>Adicionar à Google Agenda</span>
-                    <ExternalLink className="h-3 w-3" />
+                    <span>Google Agenda</span>
+                    <ExternalLink className="h-3 w-3 shrink-0" />
                   </a>
                 </div>
               </div>
@@ -275,30 +280,32 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
       {/* Modal Apps Script */}
       {showAppsScriptModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Code className="h-4 w-4 text-cyan-400" />
-                Automação com Google Apps Script (.gs)
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 max-w-2xl w-full max-h-[90dvh] overflow-y-auto shadow-2xl">
+            <div className="flex items-center justify-between gap-3 mb-3 pb-2.5 border-b border-slate-800">
+              <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                <Code className="h-4 w-4 text-cyan-400 shrink-0" />
+                <span>Automação com Google Apps Script (.gs)</span>
               </h3>
               <button
+                type="button"
                 onClick={() => setShowAppsScriptModal(false)}
-                className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded bg-slate-800"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                Fechar
+                <X className="h-4 w-4" />
               </button>
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed mb-3">
-              Conforme especificado no planejamento do grupo, este script permite sincronizar todos os eventos diretamente na sua conta do Google e programar lembretes automáticos com 7 dias, 2 dias e 24h de antecedência.
+              Conforme especificado no planejamento do grupo, este script sincroniza todos os eventos diretamente na sua conta do Google e programa lembretes automáticos com 7 dias, 2 dias e 24h de antecedência.
             </p>
 
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 mb-4">
-              <div className="flex items-center justify-between mb-2 pb-1 border-b border-slate-800 text-xs text-slate-400">
-                <span>Código.gs</span>
+              <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-800 text-xs text-slate-400">
+                <span className="font-mono">Código.gs</span>
                 <button
+                  type="button"
                   onClick={handleCopyScript}
-                  className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-medium flex items-center gap-1"
+                  className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-medium flex items-center gap-1 cursor-pointer"
                 >
                   {copiedScript ? <Check className="h-3 w-3 text-emerald-300" /> : <Copy className="h-3 w-3" />}
                   <span>{copiedScript ? 'Copiado!' : 'Copiar Código'}</span>
@@ -309,12 +316,12 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
               </pre>
             </div>
 
-            <div className="bg-slate-800/60 rounded-xl p-3 text-xs text-slate-300 space-y-1">
-              <strong className="text-white block mb-1">Como rodar em 1 minuto:</strong>
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-300 space-y-1.5">
+              <strong className="text-white block mb-1">Como executar em 1 minuto:</strong>
               <p>1. Acesse <strong>script.google.com</strong> e crie um novo projeto.</p>
               <p>2. Substitua o conteúdo do editor pelo código acima.</p>
               <p>3. Clique em <strong>Salvar</strong> e depois em <strong>Executar</strong> na função <code>criarLembretesFSG</code>.</p>
-              <p>4. Autorize com sua conta do Google e todas as provas serão agendadas com notificações push!</p>
+              <p>4. Autorize com sua conta do Google para agendar todas as avaliações.</p>
             </div>
           </div>
         </div>
@@ -323,13 +330,22 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
       {/* Modal Add Custom Exam */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
-            <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
-              <Plus className="h-4 w-4 text-indigo-400" />
-              Cadastrar Nova Prova ou Trabalho
-            </h3>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 max-w-lg w-full max-h-[90dvh] overflow-y-auto shadow-2xl">
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Plus className="h-4 w-4 text-indigo-400 shrink-0" />
+                <span>Cadastrar Nova Prova ou Trabalho</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
             <p className="text-xs text-slate-400 mb-4">
-              O evento será adicionado à sua lista local e você poderá sincronizá-lo com a Google Agenda.
+              O evento será adicionado à sua lista e poderá ser sincronizado com a Google Agenda.
             </p>
 
             <form onSubmit={handleAddNewExamSubmit} className="space-y-3.5">
@@ -343,11 +359,11 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="Ex: Prova A1 de Banco de Dados"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-300 block mb-1">
                     Disciplina de ADS
@@ -355,7 +371,7 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
                   <select
                     value={newSubject}
                     onChange={(e) => setNewSubject(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     {SUBJECTS.map((s) => (
                       <option key={s.id} value={s.name}>
@@ -372,7 +388,7 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
                   <select
                     value={newType}
                     onChange={(e) => setNewType(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="Prova A1">Prova A1</option>
                     <option value="Prova A2">Prova A2</option>
@@ -383,7 +399,7 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-300 block mb-1">
                     Data da Prova
@@ -393,7 +409,7 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
                     required
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white font-mono tabular-nums focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
@@ -406,7 +422,7 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
                     required
                     value={newTime}
                     onChange={(e) => setNewTime(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white font-mono tabular-nums focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
@@ -420,7 +436,7 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
                   value={newLocation}
                   onChange={(e) => setNewLocation(e.target.value)}
                   placeholder="Ex: FSG Lab 402 ou Portal AVA"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
@@ -433,21 +449,21 @@ export const GoogleCalendarSync: React.FC<GoogleCalendarSyncProps> = ({
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
                   placeholder="Capítulos, ementa ou links para estudo..."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs bg-slate-800 text-slate-300"
+                  className="px-4 py-2 rounded-xl text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
+                  className="px-4 py-2 rounded-xl text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors cursor-pointer"
                 >
                   Salvar Evento
                 </button>

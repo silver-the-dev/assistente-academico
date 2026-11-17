@@ -84,7 +84,7 @@ Responda como o Tutor de IA da FSG ADS para o último questionamento do aluno. M
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       contents: prompt,
       config: {
         systemInstruction: FSG_ADS_KNOWLEDGE_BASE,
@@ -127,7 +127,7 @@ Estruture a resposta com:
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       contents: prompt,
       config: {
         systemInstruction: FSG_ADS_KNOWLEDGE_BASE,
@@ -160,7 +160,7 @@ Cada questão deve ser de múltipla escolha com 4 alternativas (A, B, C, D), tra
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       contents: prompt,
       config: {
         systemInstruction: FSG_ADS_KNOWLEDGE_BASE,
@@ -223,7 +223,7 @@ Foque em conceitos cruciais para provas e entrevistas técnicas de estágio/jún
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       contents: prompt,
       config: {
         systemInstruction: FSG_ADS_KNOWLEDGE_BASE,
@@ -273,7 +273,7 @@ Use:
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       contents: prompt,
       config: {
         systemInstruction: FSG_ADS_KNOWLEDGE_BASE,
