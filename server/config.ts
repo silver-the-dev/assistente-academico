@@ -3,13 +3,14 @@ import { GoogleGenAI, GenerateContentParameters, GenerateContentResponse } from 
 
 dotenv.config();
 
-// Centralização do modelo Gemini 4 Argon conforme especificação
-export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-4-argon';
+// Modelo padrão: Gemini 4 Hydrogen, disponível gratuitamente no Free Tier da API Gemini
+// (o Gemini 4 Argon NÃO está disponível no Free Tier). Pode ser sobrescrito via GEMINI_MODEL.
+export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-4-hydrogen';
 
-// Fallback automático caso a chave GEMINI_API_KEY esteja no Free Tier (onde o Argon possui limit: 0 / erro 429)
+// Fallback automático para outros modelos gratuitos caso a cota do modelo principal se esgote (erro 429)
 const FALLBACK_MODELS = [
-  ['gemini', '4', 'hydrogen'].join('-'),
-  'gemini-3.1-flash-lite',
+  'gemini-3.8-flash',
+  'gemini-3.5-flash-lite',
 ];
 
 let activeResolvedModel: string = GEMINI_MODEL;

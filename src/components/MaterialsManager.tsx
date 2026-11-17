@@ -145,7 +145,7 @@ export const MaterialsManager: React.FC<MaterialsManagerProps> = ({
     }
 
     setIsUploading(true);
-    setUploadStepText(`Lendo e extraindo estrutura acadêmica de ${filesArray.length} arquivo(s) com Gemini 4 Argon...`);
+    setUploadStepText(`Lendo e extraindo estrutura acadêmica de ${filesArray.length} arquivo(s) com Gemini 4 Hydrogen...`);
 
     try {
       const formData = new FormData();
@@ -400,7 +400,7 @@ export const MaterialsManager: React.FC<MaterialsManagerProps> = ({
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-xs font-medium text-indigo-400">
               <Sparkles className="w-4 h-4" />
-              <span>Central de Documentos Acadêmicos · Gemini 4 Argon</span>
+              <span>Central de Documentos Acadêmicos · Gemini 4 Hydrogen</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               Meus Materiais, Planos de Ensino e Cronogramas

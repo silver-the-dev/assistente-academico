@@ -201,7 +201,7 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({
               <Bot className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-sm sm:text-base font-bold text-white">Tutor Acadêmico ADS · Gemini 4 Argon</h1>
+              <h1 className="text-sm sm:text-base font-bold text-white">Tutor Acadêmico ADS · Gemini 4 Hydrogen</h1>
               <p className="text-[11px] text-slate-400">
                 {documents.length > 0
                   ? `Ancorado em ${documents.length} documento(s) e ${disciplines.length} disciplina(s)`

@@ -201,7 +201,7 @@ export const PromptEngineeringLab: React.FC = () => {
           <h2 className="text-sm sm:text-base font-bold text-white">Playground Interativo de Teste</h2>
         </div>
         <p className="text-xs text-slate-400 mb-4">
-          Modifique o prompt ou envie variações para inspecionar a resposta em tempo real com o Gemini 4 Argon.
+          Modifique o prompt ou envie variações para inspecionar a resposta em tempo real com o Gemini 4 Hydrogen.
         </p>
 
         <div className="space-y-4">
@@ -217,7 +217,7 @@ export const PromptEngineeringLab: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span className="text-[11px] text-slate-400">
-              System Instruction Dinâmica: Gemini 4 Argon ativo no servidor
+              System Instruction Dinâmica: Gemini 4 Hydrogen ativo no servidor
             </span>
 
             <button

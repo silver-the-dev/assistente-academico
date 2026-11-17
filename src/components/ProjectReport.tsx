@@ -37,7 +37,7 @@ export const ProjectReport: React.FC<ProjectReportProps> = ({
       responsible: 'Davi Chidem',
     },
     {
-      step: '02. Extração com Gemini 4 Argon',
+      step: '02. Extração com Gemini 4 Hydrogen',
       action:
         'Configurar responseSchema + validação Zod com retry automático e regra estrita anti-alucinação de datas.',
       result: 'Eventos sem data explícita são marcados como needsReview=true para confirmação humana.',
@@ -152,7 +152,7 @@ export const ProjectReport: React.FC<ProjectReportProps> = ({
           <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-xl space-y-1.5">
             <strong className="text-white text-sm block">02. Geração Ancorada com Citação de Fonte</strong>
             <p className="leading-relaxed">
-              Simulados comentados, flashcards no sistema Leitner (caixas 1 a 5) e planos de estudo diários gerados pelo Gemini 4 Argon com referência literal ao trecho do documento.
+              Simulados comentados, flashcards no sistema Leitner (caixas 1 a 5) e planos de estudo diários gerados pelo Gemini 4 Hydrogen com referência literal ao trecho do documento.
             </p>
           </div>
           <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-xl space-y-1.5">
