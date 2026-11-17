@@ -1,395 +1,353 @@
-import React, { useState } from 'react';
-import { 
-  BookOpen, 
-  Search, 
-  User, 
-  Sparkles, 
-  HelpCircle, 
-  CheckCircle, 
-  Code, 
-  Layers, 
-  Calendar, 
+import React, { useState, useRef } from 'react';
+import {
+  BookOpen,
+  Search,
+  Sparkles,
+  Loader2,
+  FolderUp,
   Clock,
-  ArrowRight,
-  ChevronDown,
-  ChevronUp
+  GraduationCap,
+  Layers,
+  CheckSquare,
+  FileText,
+  X,
 } from 'lucide-react';
-import { marked } from 'marked';
-import { SUBJECTS, TEAM_MEMBERS } from '../data/fsgData';
-import { Subject } from '../types/academic';
+import { Discipline, SourceDoc } from '../types/academic';
+import { renderSafeMarkdown } from '../utils/markdown';
 
 interface KnowledgeBaseProps {
-  onSelectSubjectForChat: (subjectName: string) => void;
-  onSelectSubjectForPlanner: (subjectName: string) => void;
-  onSelectSubjectForQuiz: (subjectName: string) => void;
+  disciplines: Discipline[];
+  documents: SourceDoc[];
+  onNavigateToMaterials: () => void;
+  onOpenSimulado: (disciplineId: string) => void;
+  onOpenFlashcards: (disciplineId: string) => void;
+  onOpenPlanner: (disciplineId: string) => void;
 }
 
+const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
 export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
-  onSelectSubjectForChat,
-  onSelectSubjectForPlanner,
-  onSelectSubjectForQuiz,
+  disciplines,
+  documents,
+  onNavigateToMaterials,
+  onOpenSimulado,
+  onOpenFlashcards,
+  onOpenPlanner,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMember, setSelectedMember] = useState<string>('all');
-  const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(SUBJECTS[0].id);
-
-  // Concept Explainer Drawer
-  const [conceptQuery, setConceptQuery] = useState('');
-  const [conceptSubject, setConceptSubject] = useState(SUBJECTS[0].name);
-  const [isExplaining, setIsExplaining] = useState(false);
+  const [selectedDisciplineId, setSelectedDisciplineId] = useState<string>('');
+  const [explainingTopic, setExplainingTopic] = useState<string | null>(null);
   const [explanationResult, setExplanationResult] = useState<string | null>(null);
-  const [showExplainerModal, setShowExplainerModal] = useState(false);
+  const [explanationError, setExplanationError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const filteredSubjects = SUBJECTS.filter((subject) => {
-    const matchesSearch =
-      subject.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      subject.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      subject.topics.some((t) => t.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      subject.keyTerms.some((k) => k.toLowerCase().includes(searchTerm.toLowerCase()));
+  if (disciplines.length === 0) {
+    return (
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-8 sm:p-12 text-center max-w-2xl mx-auto my-6 space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-indigo-600/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mx-auto">
+          <BookOpen className="w-7 h-7" />
+        </div>
+        <h2 className="text-xl font-bold text-white">Nenhuma disciplina cadastrada ainda</h2>
+        <p className="text-sm text-slate-400 leading-relaxed">
+          As matérias, ementas, bibliografias e horários não são mais fictícios: eles são extraídos automaticamente dos
+          seus documentos reais (Planos de Ensino, Cronogramas ou Apostilas).
+        </p>
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={onNavigateToMaterials}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+          >
+            <FolderUp className="w-4 h-4" />
+            <span>Ir para Materiais e Enviar Documentos</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-    const matchesMember =
-      selectedMember === 'all' || subject.responsible === selectedMember;
-
-    return matchesSearch && matchesMember;
+  const filteredDisciplines = disciplines.filter((d) => {
+    const q = searchTerm.toLowerCase();
+    return (
+      d.name.toLowerCase().includes(q) ||
+      (d.code && d.code.toLowerCase().includes(q)) ||
+      (d.professor && d.professor.toLowerCase().includes(q)) ||
+      d.syllabus.some((s) => s.toLowerCase().includes(q))
+    );
   });
 
-  const handleExplainConcept = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!conceptQuery) return;
-    setIsExplaining(true);
+  const activeDiscipline =
+    disciplines.find((d) => d.id === selectedDisciplineId) || filteredDisciplines[0] || disciplines[0];
+
+  const handleExplainTopic = async (topic: string, disc: Discipline) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    setExplainingTopic(topic);
     setExplanationResult(null);
+    setExplanationError(null);
 
     try {
       const response = await fetch('/api/explain-concept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          concept: conceptQuery,
-          subject: conceptSubject,
+          concept: topic,
+          disciplineId: disc.id,
+          disciplineName: disc.name,
+          documents: documents.map((doc) => ({
+            id: doc.id,
+            name: doc.name,
+            kind: doc.kind,
+            disciplineIds: doc.disciplineIds,
+            extractedText: doc.extractedText,
+          })),
         }),
+        signal: controller.signal,
       });
 
-      if (!response.ok) throw new Error('Erro ao explicar conceito');
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao explicar o tópico.');
+      }
       setExplanationResult(data.explanation);
-    } catch (err: any) {
-      setExplanationResult(`### ⚠️ Erro ao gerar explicação\nDetalhes: ${err.message}`);
+    } catch (err: unknown) {
+      if ((err as Error)?.name === 'AbortError') return;
+      setExplanationError((err as Error)?.message || 'Falha ao buscar explicação.');
     } finally {
-      setIsExplaining(false);
+      setExplainingTopic(null);
     }
   };
 
-  const openExplainerForSubject = (subject: Subject, term?: string) => {
-    setConceptSubject(subject.name);
-    if (term) setConceptQuery(term);
-    setShowExplainerModal(true);
-  };
-
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      {/* Title */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+    <div className="space-y-6">
+      {/* Header & Search */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-1">
-            <BookOpen className="h-4 w-4" />
-            <span>Base de Conhecimento ADS · FSG</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            15 Matérias do Curso de ADS
+          <h1 className="text-xl sm:text-2xl font-bold text-white">
+            Disciplinas Extraídas dos Seus Documentos ({disciplines.length})
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
-            Ementas, tópicos práticos, palavras-chave e materiais organizados em 3 frentes de 5 matérias cada pelos integrantes Davi Chidem, Guilherme Matte e João.
+          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            Clique em qualquer tópico da ementa para gerar uma aula completa baseada no seu material.
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setConceptQuery('Orientação a Objetos');
-            setConceptSubject('Programação Orientada a Objetos (POO)');
-            setShowExplainerModal(true);
-          }}
-          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 text-white text-xs font-semibold shadow-md flex items-center gap-1.5 transition cursor-pointer"
-        >
-          <Sparkles className="h-4 w-4 text-cyan-300" />
-          <span>Explicar Conceito de Forma Simples</span>
-        </button>
-      </div>
-
-      {/* Team Allocation Cards (Etapa 1 do Plano de Ação) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {TEAM_MEMBERS.map((member) => (
-          <div
-            key={member.id}
-            onClick={() => setSelectedMember(selectedMember === member.name ? 'all' : member.name)}
-            className={`p-4 rounded-2xl border transition cursor-pointer ${
-              selectedMember === member.name
-                ? 'bg-indigo-950/40 border-indigo-500 shadow-md shadow-indigo-500/20'
-                : 'bg-slate-900 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-9 w-9 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 font-bold text-xs">
-                {member.name.split(' ').map((n) => n[0]).join('')}
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">{member.name}</h3>
-                <span className="text-[11px] text-indigo-400 font-medium">
-                  {member.subjectsCount} matérias de ADS
-                </span>
-              </div>
-            </div>
-            <p className="text-xs text-slate-400 line-clamp-2 mb-2 font-light">
-              Foco: {member.role}
-            </p>
-            <div className="text-[10px] text-slate-400 font-medium">
-              {selectedMember === member.name ? '✓ Filtro Ativo (clique para limpar)' : 'Clique para filtrar matérias'}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Search and Member Filter Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md">
-        <div className="relative flex-1 min-w-[260px]">
-          <Search className="h-4 w-4 text-slate-400 absolute left-3 top-2.5" />
+        <div className="relative w-full md:w-72">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por disciplina, ementa ou palavra-chave (ex: SQL, Big-O, Docker, Scrum)..."
-            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+            placeholder="Buscar disciplina ou tópico..."
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500"
           />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Responsável:</span>
-          <select
-            value={selectedMember}
-            onChange={(e) => setSelectedMember(e.target.value)}
-            className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-          >
-            <option value="all">Todos os Integrantes (15 Matérias)</option>
-            {TEAM_MEMBERS.map((m) => (
-              <option key={m.id} value={m.name}>
-                {m.name}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
-      {/* Subjects List */}
-      <div className="space-y-4">
-        {filteredSubjects.map((subject) => {
-          const isExpanded = expandedSubjectId === subject.id;
-
-          return (
-            <div
-              key={subject.id}
-              className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg transition"
-            >
-              {/* Header row */}
-              <div 
-                className="flex items-start justify-between gap-3 cursor-pointer select-none"
-                onClick={() => setExpandedSubjectId(isExpanded ? null : subject.id)}
+      {/* Main Split Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left List of Disciplines */}
+        <div className="lg:col-span-4 space-y-2.5">
+          {filteredDisciplines.map((disc) => {
+            const isSelected = activeDiscipline?.id === disc.id;
+            return (
+              <button
+                key={disc.id}
+                type="button"
+                onClick={() => {
+                  setSelectedDisciplineId(disc.id);
+                  setExplanationResult(null);
+                }}
+                className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-indigo-600/15 border-indigo-500 text-white shadow-lg shadow-indigo-600/10'
+                    : 'bg-slate-900/80 border-slate-800/90 text-slate-300 hover:bg-slate-900 hover:border-slate-700'
+                }`}
               >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                      {subject.code}
-                    </span>
-                    <span className="text-[11px] text-slate-400">
-                      {subject.semester}º Semestre · Carga: {subject.workload}
-                    </span>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                      Responsável: {subject.responsible}
-                    </span>
-                  </div>
-
-                  <h3 className="text-base sm:text-lg font-bold text-white hover:text-indigo-300 transition">
-                    {subject.name}
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1 max-w-4xl">
-                    {subject.description}
-                  </p>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="text-sm font-bold text-white leading-snug">{disc.name}</h3>
+                  {disc.code && <span className="text-[11px] font-mono text-indigo-300 shrink-0">{disc.code}</span>}
                 </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-1.5">
+                  {disc.professor && <span>Prof. {disc.professor}</span>}
+                  {disc.workloadHours && <span>· {disc.workloadHours}h</span>}
+                  <span>· {disc.syllabus.length} tópicos</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
 
-                <button className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white shrink-0 mt-1">
-                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        {/* Right Detail Panel */}
+        {activeDiscipline && (
+          <div className="lg:col-span-8 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-slate-800">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-indigo-400 font-mono">
+                  {activeDiscipline.code && <span>{activeDiscipline.code}</span>}
+                  {activeDiscipline.semester && <span>· Semestre: {activeDiscipline.semester}</span>}
+                  {activeDiscipline.workloadHours && <span>· Carga: {activeDiscipline.workloadHours}h</span>}
+                </div>
+                <h2 className="text-xl font-bold text-white">{activeDiscipline.name}</h2>
+                {activeDiscipline.professor && (
+                  <p className="text-xs sm:text-sm text-slate-400">Docente: {activeDiscipline.professor}</p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onOpenSimulado(activeDiscipline.id)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer"
+                >
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>Gerar Simulado</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenFlashcards(activeDiscipline.id)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 cursor-pointer"
+                >
+                  <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Flashcards</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenPlanner(activeDiscipline.id)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 cursor-pointer"
+                >
+                  <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Plano de Estudo</span>
                 </button>
               </div>
+            </div>
 
-              {/* Key terms pills */}
-              <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2 border-t border-slate-800/80">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold mr-1">Termos-chave:</span>
-                {subject.keyTerms.map((term, i) => (
-                  <button
-                    key={i}
-                    onClick={() => openExplainerForSubject(subject, term)}
-                    className="text-[11px] px-2 py-0.5 rounded-md bg-slate-950 hover:bg-indigo-950/80 text-slate-300 hover:text-indigo-300 border border-slate-800 hover:border-indigo-500/40 transition"
-                  >
-                    {term}
-                  </button>
-                ))}
+            {/* Schedule & Evaluation Criteria */}
+            {(activeDiscipline.schedule.length > 0 || activeDiscipline.evaluationCriteria) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {activeDiscipline.schedule.length > 0 && (
+                  <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 space-y-2">
+                    <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Horários de Aula</span>
+                    </h4>
+                    <div className="space-y-1 text-xs text-slate-400 font-mono">
+                      {activeDiscipline.schedule.map((slot, idx) => (
+                        <div key={idx}>
+                          {DAY_NAMES[slot.dayOfWeek]} · {slot.startTime} às {slot.endTime}
+                          {slot.location ? ` (${slot.location})` : ''}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeDiscipline.evaluationCriteria && (
+                  <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 space-y-2">
+                    <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Critérios de Avaliação</span>
+                    </h4>
+                    <p className="text-xs text-slate-400 leading-relaxed">{activeDiscipline.evaluationCriteria}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Syllabus Topics with AI Explanation */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-white">
+                  Conteúdo Programático / Ementa ({activeDiscipline.syllabus.length})
+                </h3>
+                <span className="text-xs text-slate-400">Clique em um tópico para explicação com IA</span>
               </div>
 
-              {/* Expanded details */}
-              {isExpanded && (
-                <div className="mt-4 pt-4 border-t border-slate-800 space-y-4">
-                  {/* Topics list */}
-                  <div>
-                    <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <BookOpen className="h-3.5 w-3.5 text-indigo-400" />
-                      Ementa Detalhada e Tópicos de Prova
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {subject.topics.map((topic, i) => (
-                        <div
-                          key={i}
-                          className="bg-slate-950/60 border border-slate-850 p-2.5 rounded-xl text-xs text-slate-300 flex items-start gap-2"
-                        >
-                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 shrink-0 mt-1.5" />
-                          <span>{topic}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Sample exam questions */}
-                  <div>
-                    <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <HelpCircle className="h-3.5 w-3.5 text-cyan-400" />
-                      Exemplos de Questões Respondidas pelo Agente
-                    </h4>
-                    <div className="space-y-1.5">
-                      {subject.sampleQuestions.map((q, i) => (
-                        <div
-                          key={i}
-                          onClick={() => onSelectSubjectForChat(`${subject.name}: ${q}`)}
-                          className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-850 border border-slate-800 hover:border-indigo-500/40 text-xs text-slate-300 cursor-pointer transition flex items-center justify-between group"
-                        >
-                          <span>"{q}"</span>
-                          <span className="text-[11px] text-indigo-400 opacity-0 group-hover:opacity-100 flex items-center gap-1">
-                            Perguntar ao Tutor <ArrowRight className="h-3 w-3" />
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Action Shortcuts */}
-                  <div className="pt-2 flex flex-wrap gap-2.5">
-                    <button
-                      onClick={() => onSelectSubjectForChat(`Olá tutor! Preciso de ajuda na matéria de ${subject.name}. Poderia me dar um resumo dos pontos mais importantes?`)}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm transition"
-                    >
-                      <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
-                      <span>Tirar Dúvidas com o Tutor</span>
-                    </button>
-
-                    <button
-                      onClick={() => onSelectSubjectForPlanner(subject.name)}
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition"
-                    >
-                      <Calendar className="h-3.5 w-3.5 text-indigo-400" />
-                      <span>Montar Cronograma</span>
-                    </button>
-
-                    <button
-                      onClick={() => onSelectSubjectForQuiz(subject.name)}
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition"
-                    >
-                      <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
-                      <span>Fazer Simulado</span>
-                    </button>
-
-                    <button
-                      onClick={() => openExplainerForSubject(subject)}
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition ml-auto"
-                    >
-                      <HelpCircle className="h-3.5 w-3.5 text-amber-400" />
-                      <span>Explicar Conceito</span>
-                    </button>
-                  </div>
+              {activeDiscipline.syllabus.length === 0 ? (
+                <p className="text-xs text-slate-400 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+                  Nenhum tópico individual listado na ementa desta disciplina.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {activeDiscipline.syllabus.map((topic, idx) => {
+                    const isLoadingThis = explainingTopic === topic;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleExplainTopic(topic, activeDiscipline)}
+                        className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-950/80 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-500/50 text-left transition-all group cursor-pointer"
+                      >
+                        <span className="text-xs sm:text-sm text-slate-200 group-hover:text-white font-medium">
+                          {topic}
+                        </span>
+                        {isLoadingThis ? (
+                          <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
-          );
-        })}
-      </div>
 
-      {/* Explainer Modal */}
-      {showExplainerModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-400" />
-                Explicador Didático de Conceitos de ADS
-              </h3>
-              <button
-                onClick={() => setShowExplainerModal(false)}
-                className="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-400 hover:text-white"
-              >
-                Fechar
-              </button>
-            </div>
-
-            <form onSubmit={handleExplainConcept} className="space-y-3 mb-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-300 block mb-1">
-                    Disciplina
-                  </label>
-                  <select
-                    value={conceptSubject}
-                    onChange={(e) => setConceptSubject(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+            {/* AI Concept Explanation Box */}
+            {(explainingTopic || explanationResult || explanationError) && (
+              <div className="bg-slate-950 border border-indigo-500/40 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-indigo-400">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Explicação Didática Ancorada nos Documentos</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExplanationResult(null);
+                      setExplanationError(null);
+                    }}
+                    className="text-slate-400 hover:text-white cursor-pointer"
                   >
-                    {SUBJECTS.map((s) => (
-                      <option key={s.id} value={s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
 
-                <div>
-                  <label className="text-xs font-medium text-slate-300 block mb-1">
-                    Conceito a Descomplicar
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={conceptQuery}
-                    onChange={(e) => setConceptQuery(e.target.value)}
-                    placeholder="Ex: Polimorfismo, JOINs, 3FN, Recursão, Big-O..."
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                {explainingTopic && (
+                  <div className="py-6 flex items-center justify-center gap-3 text-xs sm:text-sm text-slate-300">
+                    <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                    <span>Consultando seus materiais para explicar &ldquo;{explainingTopic}&rdquo;...</span>
+                  </div>
+                )}
+
+                {explanationError && <p className="text-xs text-red-400">{explanationError}</p>}
+
+                {explanationResult && (
+                  <div
+                    className="markdown-content"
+                    dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(explanationResult) }}
                   />
-                </div>
+                )}
               </div>
+            )}
 
-              <button
-                type="submit"
-                disabled={isExplaining || !conceptQuery}
-                className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition"
-              >
-                {isExplaining ? 'Gerando explicação didática...' : 'Explicar de Forma Simples com Analogia e Código'}
-              </button>
-            </form>
-
-            {explanationResult && (
-              <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 prose prose-invert prose-sm max-w-none text-xs leading-relaxed overflow-x-auto">
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: marked.parse(explanationResult, { breaks: true, gfm: true }) as string,
-                  }}
-                />
+            {/* Bibliography & Source Documents */}
+            {activeDiscipline.bibliography && activeDiscipline.bibliography.length > 0 && (
+              <div className="space-y-2 pt-3 border-t border-slate-800">
+                <h4 className="text-xs font-bold text-slate-300">Bibliografia Extraída</h4>
+                <ul className="space-y-1 text-xs text-slate-400 list-disc pl-4">
+                  {activeDiscipline.bibliography.map((b, i) => (
+                    <li key={i}>{b}</li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

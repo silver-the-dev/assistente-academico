@@ -1,329 +1,492 @@
-import React, { useState } from 'react';
-import { 
-  Layers, 
-  RotateCw, 
-  Check, 
-  X, 
-  Sparkles, 
-  Lightbulb, 
-  ChevronRight, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Layers,
+  Sparkles,
+  Loader2,
+  FolderUp,
   ChevronLeft,
-  Filter,
-  PlusCircle,
-  BookOpen
+  ChevronRight,
+  RotateCw,
+  CheckCircle2,
+  RefreshCw,
+  FileText,
+  Lightbulb,
+  Trash2,
 } from 'lucide-react';
-import { Flashcard } from '../types/academic';
-import { INITIAL_FLASHCARDS, SUBJECTS } from '../data/fsgData';
+import { Discipline, SourceDoc, Flashcard } from '../types/academic';
+import { storage } from '../services/storage';
 
-export const FlashcardsView: React.FC = () => {
-  const [cards, setCards] = useState<Flashcard[]>(INITIAL_FLASHCARDS);
+interface FlashcardsViewProps {
+  disciplines: Discipline[];
+  documents: SourceDoc[];
+  flashcards: Flashcard[];
+  initialDisciplineId?: string;
+  pendingErrorContext?: { disciplineId: string; wrongQuestionsContext: string[] } | null;
+  onClearPendingErrorContext?: () => void;
+  onNavigateToMaterials: () => void;
+}
+
+const LEITNER_INTERVAL_DAYS: Record<1 | 2 | 3 | 4 | 5, number> = {
+  1: 0,
+  2: 1,
+  3: 3,
+  4: 7,
+  5: 14,
+};
+
+function addDaysIso(days: number): string {
+  const dt = new Date();
+  dt.setDate(dt.getDate() + days);
+  return dt.toISOString().split('T')[0];
+}
+
+export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
+  disciplines,
+  documents,
+  flashcards,
+  initialDisciplineId,
+  pendingErrorContext,
+  onClearPendingErrorContext,
+  onNavigateToMaterials,
+}) => {
+  const [selectedDisciplineId, setSelectedDisciplineId] = useState<string>(
+    initialDisciplineId || disciplines[0]?.id || ''
+  );
+  const [filterMode, setFilterMode] = useState<'due' | 'all'>('all');
+  const [cardCountToGenerate, setCardCountToGenerate] = useState<number>(8);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
-  const [masteredIds, setMasteredIds] = useState<Set<string>>(new Set());
-  const [reviewIds, setReviewIds] = useState<Set<string>>(new Set());
 
-  // Generator states
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [genSubject, setGenSubject] = useState(SUBJECTS[0].name);
-  const [showGenModal, setShowGenModal] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const filteredCards = selectedSubjectFilter === 'all'
-    ? cards
-    : cards.filter((c) => c.subjectId === selectedSubjectFilter);
+  useEffect(() => {
+    if (initialDisciplineId) {
+      setSelectedDisciplineId(initialDisciplineId);
+    } else if (!selectedDisciplineId && disciplines.length > 0) {
+      setSelectedDisciplineId(disciplines[0].id);
+    }
+  }, [initialDisciplineId, disciplines, selectedDisciplineId]);
 
-  const currentCard: Flashcard | undefined = filteredCards[currentIndex];
+  const generateCards = async (disc: Discipline, wrongQuestionsContext?: string[]) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
-  const handleFlip = () => {
-    setIsFlipped(!isFlipped);
-  };
-
-  const handleNext = () => {
-    setIsFlipped(false);
-    setShowHint(false);
-    setCurrentIndex((prev) => (prev + 1) % (filteredCards.length || 1));
-  };
-
-  const handlePrev = () => {
-    setIsFlipped(false);
-    setShowHint(false);
-    setCurrentIndex((prev) => (prev - 1 + (filteredCards.length || 1)) % (filteredCards.length || 1));
-  };
-
-  const markMastered = (id: string) => {
-    setMasteredIds((prev) => new Set(prev).add(id));
-    setReviewIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    handleNext();
-  };
-
-  const markReview = (id: string) => {
-    setReviewIds((prev) => new Set(prev).add(id));
-    setMasteredIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    handleNext();
-  };
-
-  const handleGenerateCards = async (e: React.FormEvent) => {
-    e.preventDefault();
     setIsGenerating(true);
+    setErrorMessage(null);
 
     try {
-      const res = await fetch('/api/flashcards', {
+      const response = await fetch('/api/flashcards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject: genSubject, count: 6 }),
+        body: JSON.stringify({
+          disciplineId: disc.id,
+          disciplineName: disc.name,
+          syllabus: disc.syllabus,
+          count: cardCountToGenerate,
+          wrongQuestionsContext,
+          documents: documents.map((d) => ({
+            id: d.id,
+            name: d.name,
+            kind: d.kind,
+            disciplineIds: d.disciplineIds,
+            extractedText: d.extractedText,
+          })),
+        }),
+        signal: controller.signal,
       });
 
-      if (!res.ok) throw new Error('Falha ao gerar flashcards');
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao gerar flashcards.');
+      }
 
-      const data = await res.json();
-      const subjectObj = SUBJECTS.find((s) => s.name === genSubject);
-      const newFlashcards: Flashcard[] = data.map((item: any, i: number) => ({
-        id: `ai-fc-${Date.now()}-${i}`,
-        subjectId: subjectObj ? subjectObj.id : 'ads-general',
-        category: item.category || 'Fixação ADS',
-        front: item.front,
-        back: item.back,
-        hint: item.hint,
-      }));
+      const todayIso = new Date().toISOString().split('T')[0];
+      const newCards: Flashcard[] = (data.flashcards || []).map(
+        (
+          c: {
+            category: string;
+            front: string;
+            back: string;
+            hint?: string;
+            sourceExcerpt: string;
+          },
+          idx: number
+        ) => ({
+          id: `fc-${Date.now()}-${idx}`,
+          disciplineId: disc.id,
+          disciplineName: disc.name,
+          category: c.category,
+          front: c.front,
+          back: c.back,
+          hint: c.hint,
+          sourceDocId: disc.sourceDocIds[0] || documents[0]?.id || 'doc',
+          sourceExcerpt: c.sourceExcerpt,
+          box: 1,
+          nextReviewAt: todayIso,
+        })
+      );
 
-      setCards((prev) => [...newFlashcards, ...prev]);
-      setShowGenModal(false);
+      await storage.saveFlashcardsBatch(newCards);
       setCurrentIndex(0);
       setIsFlipped(false);
-    } catch (err: any) {
-      alert('Erro ao gerar flashcards: ' + err.message);
+      setShowHint(false);
+    } catch (err: unknown) {
+      if ((err as Error)?.name === 'AbortError') return;
+      setErrorMessage((err as Error)?.message || 'Falha ao gerar flashcards.');
     } finally {
       setIsGenerating(false);
     }
   };
 
+  // Trigger automatic generation when redirected from SimuladoEngine errors
+  useEffect(() => {
+    if (pendingErrorContext && disciplines.length > 0) {
+      const targetDisc =
+        disciplines.find((d) => d.id === pendingErrorContext.disciplineId) || disciplines[0];
+      setSelectedDisciplineId(targetDisc.id);
+      generateCards(targetDisc, pendingErrorContext.wrongQuestionsContext);
+      if (onClearPendingErrorContext) onClearPendingErrorContext();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingErrorContext]);
+
+  if (disciplines.length === 0) {
+    return (
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-8 sm:p-12 text-center max-w-2xl mx-auto my-6 space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-indigo-600/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mx-auto">
+          <Layers className="w-7 h-7" />
+        </div>
+        <h2 className="text-xl font-bold text-white">Flashcards com Repetição Espaçada (Leitner)</h2>
+        <p className="text-sm text-slate-400 leading-relaxed">
+          Envie seus documentos acadêmicos na aba <strong>Materiais</strong> para gerar flashcards ancorados na sua
+          ementa e praticar com o método de 5 caixas de Leitner.
+        </p>
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={onNavigateToMaterials}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+          >
+            <FolderUp className="w-4 h-4" />
+            <span>Enviar Documentos na Aba Materiais</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const todayIso = new Date().toISOString().split('T')[0];
+  const disciplineCards = flashcards.filter(
+    (c) => !selectedDisciplineId || c.disciplineId === selectedDisciplineId
+  );
+  const dueCards = disciplineCards.filter((c) => c.nextReviewAt <= todayIso);
+  const activeDeck = filterMode === 'due' ? dueCards : disciplineCards;
+
+  const safeIndex = activeDeck.length > 0 ? Math.min(currentIndex, activeDeck.length - 1) : 0;
+  const currentCard = activeDeck[safeIndex];
+
+  const handleReviewAnswer = async (knewIt: boolean) => {
+    if (!currentCard) return;
+    const nextBox = knewIt ? (Math.min(5, currentCard.box + 1) as 1 | 2 | 3 | 4 | 5) : 1;
+    const nextReviewAt = addDaysIso(LEITNER_INTERVAL_DAYS[nextBox]);
+
+    await storage.saveFlashcard({
+      ...currentCard,
+      box: nextBox,
+      nextReviewAt,
+    });
+
+    setIsFlipped(false);
+    setShowHint(false);
+    if (safeIndex + 1 < activeDeck.length) {
+      setCurrentIndex(safeIndex + 1);
+    } else {
+      setCurrentIndex(0);
+    }
+  };
+
+  const selectedDiscipline =
+    disciplines.find((d) => d.id === selectedDisciplineId) || disciplines[0];
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div>
-          <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-1">
-            <Layers className="h-4 w-4" />
-            <span>Memorização Ativa & Revisão Espaçada</span>
+    <div className="space-y-6">
+      {/* Top Controls Bar */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xl">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-semibold text-indigo-400">
+            <Sparkles className="w-4 h-4" />
+            <span>Sistema Leitner de 5 Caixas · Repetição Espaçada</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Flashcards de ADS
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Fixe conceitos fundamentais para provas, estágios e entrevistas técnicas com cartões de repetição ativa.
+          <h1 className="text-xl font-bold text-white">Flashcards Inteligentes</h1>
+          <p className="text-xs text-slate-400">
+            Cartões gerados diretamente dos seus arquivos com controle automático de vencimento de revisão.
           </p>
         </div>
 
-        <button
-          onClick={() => setShowGenModal(true)}
-          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition cursor-pointer"
-        >
-          <Sparkles className="h-4 w-4 text-cyan-300" />
-          <span>Criar Flashcards com IA</span>
-        </button>
-      </div>
-
-      {/* Filter and stats */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-slate-400" />
+        <div className="flex flex-wrap items-center gap-2.5">
           <select
-            value={selectedSubjectFilter}
+            value={selectedDisciplineId}
             onChange={(e) => {
-              setSelectedSubjectFilter(e.target.value);
+              setSelectedDisciplineId(e.target.value);
               setCurrentIndex(0);
               setIsFlipped(false);
             }}
-            className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+            className="bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500"
           >
-            <option value="all">Todas as Disciplinas ({cards.length})</option>
-            {SUBJECTS.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
+            <option value="">Todas as disciplinas ({flashcards.length})</option>
+            {disciplines.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
               </option>
             ))}
           </select>
-        </div>
 
-        <div className="flex items-center gap-3 text-xs">
-          <span className="text-emerald-400 flex items-center gap-1">
-            <Check className="h-3.5 w-3.5" /> Dominados: {masteredIds.size}
-          </span>
-          <span className="text-rose-400 flex items-center gap-1">
-            <X className="h-3.5 w-3.5" /> Revisar: {reviewIds.size}
-          </span>
+          <select
+            value={cardCountToGenerate}
+            onChange={(e) => setCardCountToGenerate(Number(e.target.value))}
+            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
+          >
+            <option value={6}>+6 cartões</option>
+            <option value={10}>+10 cartões</option>
+            <option value={15}>+15 cartões</option>
+          </select>
+
+          <button
+            type="button"
+            disabled={isGenerating || !selectedDiscipline}
+            onClick={() => selectedDiscipline && generateCards(selectedDiscipline)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Gerando...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                <span>Gerar Novos Cartões com IA</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Main Flashcard Container */}
-      {currentCard ? (
-        <div className="flex flex-col items-center">
-          {/* Flip Card with 3D perspective */}
-          <div
-            onClick={handleFlip}
-            className="w-full max-w-xl min-h-[300px] sm:min-h-[340px] cursor-pointer group perspective select-none"
-          >
-            <div
-              className={`relative w-full h-full min-h-[300px] sm:min-h-[340px] rounded-3xl p-6 sm:p-8 transition-transform duration-500 preserve-3d shadow-2xl border flex flex-col justify-between ${
-                isFlipped
-                  ? 'bg-slate-900 border-indigo-500/50 shadow-indigo-500/10 rotate-y-180'
-                  : 'bg-slate-900/90 border-slate-800 hover:border-slate-700 shadow-slate-950/50'
-              }`}
-            >
-              {/* Card Header */}
-              <div className="flex items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800">
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 font-medium text-indigo-300">
-                  {currentCard.category}
-                </span>
-                <span className="flex items-center gap-1 text-[11px]">
-                  <RotateCw className="h-3 w-3 text-slate-400 group-hover:rotate-180 transition-transform duration-500" />
-                  <span>Clique para virar ({currentIndex + 1} de {filteredCards.length})</span>
-                </span>
-              </div>
-
-              {/* Card Center Content */}
-              <div className="my-auto py-4">
-                {!isFlipped ? (
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400 block mb-2">
-                      Pergunta / Conceito
-                    </span>
-                    <h2 className="text-lg sm:text-xl font-semibold text-white leading-relaxed">
-                      {currentCard.front}
-                    </h2>
-                  </div>
-                ) : (
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 block mb-2">
-                      Resposta / Aplicação Prática
-                    </span>
-                    <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-normal">
-                      {currentCard.back}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Card Footer */}
-              <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                {currentCard.hint ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowHint(!showHint);
-                    }}
-                    className="flex items-center gap-1 text-amber-400/90 hover:text-amber-300 transition"
-                  >
-                    <Lightbulb className="h-3.5 w-3.5" />
-                    <span>{showHint ? currentCard.hint : 'Ver dica'}</span>
-                  </button>
-                ) : <span />}
-
-                <span className="text-[11px] text-slate-400">
-                  {isFlipped ? 'Verso do Cartão' : 'Anverso'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Action buttons under card */}
-          <div className="w-full max-w-xl flex items-center justify-between gap-3 mt-6">
-            <button
-              onClick={() => markReview(currentCard.id)}
-              className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-rose-950/40 text-rose-300 border border-slate-800 hover:border-rose-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
-            >
-              <X className="h-4 w-4" />
-              <span>Preciso Revisar</span>
-            </button>
-
-            <div className="flex items-center gap-1 px-2">
-              <button
-                onClick={handlePrev}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-                title="Cartão anterior"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                onClick={handleNext}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-                title="Próximo cartão"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-
-            <button
-              onClick={() => markMastered(currentCard.id)}
-              className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-emerald-950/40 text-emerald-300 border border-slate-800 hover:border-emerald-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
-            >
-              <Check className="h-4 w-4" />
-              <span>Acertei / Já Sei!</span>
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 text-center text-slate-400">
-          Nenhum cartão encontrado para este filtro.
+      {errorMessage && (
+        <div className="bg-red-950/50 border border-red-800 rounded-xl p-4 text-xs text-red-200">
+          {errorMessage}
         </div>
       )}
 
-      {/* Generator Modal */}
-      {showGenModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-indigo-400" />
-              Gerar Flashcards com o Modelo Gemini
-            </h3>
-            <p className="text-xs text-slate-400 mb-4">
-              O assistente criará 6 flashcards conceituais focados em provas e entrevistas técnicas.
-            </p>
+      {/* Leitner Filter & Box Distribution */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="inline-flex p-1 rounded-xl bg-slate-900 border border-slate-800 self-start">
+          <button
+            type="button"
+            onClick={() => {
+              setFilterMode('all');
+              setCurrentIndex(0);
+              setIsFlipped(false);
+            }}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              filterMode === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Todos os Cartões ({disciplineCards.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFilterMode('due');
+              setCurrentIndex(0);
+              setIsFlipped(false);
+            }}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              filterMode === 'due' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Para Revisar Hoje ({dueCards.length})
+          </button>
+        </div>
 
-            <form onSubmit={handleGenerateCards} className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
-                  Selecione a Disciplina de ADS
-                </label>
-                <select
-                  value={genSubject}
-                  onChange={(e) => setGenSubject(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-                >
-                  {SUBJECTS.map((s) => (
-                    <option key={s.id} value={s.name}>
-                      {s.name} ({s.responsible})
-                    </option>
-                  ))}
-                </select>
+        <div className="flex items-center gap-2 text-xs text-slate-400 font-mono tabular-nums">
+          {[1, 2, 3, 4, 5].map((boxNum) => {
+            const count = disciplineCards.filter((c) => c.box === boxNum).length;
+            return (
+              <span key={boxNum} className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
+                Caixa {boxNum}: <strong className="text-white">{count}</strong>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main 3D Card Viewport */}
+      {!currentCard ? (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-10 text-center space-y-3">
+          <Layers className="w-10 h-10 text-slate-600 mx-auto" />
+          <h3 className="text-base font-bold text-white">
+            {filterMode === 'due'
+              ? 'Parabéns! Você revisou todos os flashcards vencidos de hoje.'
+              : 'Nenhum flashcard gerado para esta disciplina ainda.'}
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
+            Clique em &ldquo;Gerar Novos Cartões com IA&rdquo; acima para criar flashcards a partir dos documentos enviados.
+          </p>
+        </div>
+      ) : (
+        <div className="max-w-3xl mx-auto space-y-5">
+          {/* Card Counter & Metadata */}
+          <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+            <span>
+              Cartão {safeIndex + 1} de {activeDeck.length} · {currentCard.category}
+            </span>
+            <div className="flex items-center gap-3">
+              <span>
+                Caixa Leitner {currentCard.box}/5 · Próxima revisão: {currentCard.nextReviewAt}
+              </span>
+              <button
+                type="button"
+                onClick={() => storage.deleteFlashcard(currentCard.id)}
+                title="Excluir cartão"
+                className="text-slate-500 hover:text-red-400 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* 3D Flip Card */}
+          <div
+            onClick={() => setIsFlipped((prev) => !prev)}
+            className="perspective cursor-pointer select-none"
+          >
+            <div
+              className={`relative w-full min-h-[320px] sm:min-h-[360px] transition-transform duration-500 preserve-3d ${
+                isFlipped ? 'rotate-y-180' : ''
+              }`}
+            >
+              {/* FRONT FACE */}
+              <div className="absolute inset-0 backface-hidden bg-slate-900 border-2 border-slate-800 hover:border-indigo-500/60 rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-2xl">
+                <div className="flex items-center justify-between text-xs text-indigo-400 font-semibold">
+                  <span>FRENTE · PERGUNTA</span>
+                  <span className="inline-flex items-center gap-1 text-slate-400">
+                    <RotateCw className="w-3.5 h-3.5" />
+                    <span>Clique para virar</span>
+                  </span>
+                </div>
+
+                <div className="my-auto py-6 text-center">
+                  <h2 className="text-lg sm:text-2xl font-bold text-white leading-relaxed">
+                    {currentCard.front}
+                  </h2>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  {currentCard.hint ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowHint((prev) => !prev);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs text-amber-300 hover:text-amber-200 cursor-pointer"
+                    >
+                      <Lightbulb className="w-3.5 h-3.5" />
+                      <span>{showHint ? currentCard.hint : 'Ver dica'}</span>
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                  <span className="text-[11px] text-slate-500">{currentCard.disciplineName}</span>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowGenModal(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs bg-slate-800 text-slate-300"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isGenerating}
-                  className="px-4 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1.5"
-                >
-                  {isGenerating ? 'Gerando...' : 'Criar Cartões'}
-                </button>
+              {/* BACK FACE */}
+              <div className="absolute inset-0 backface-hidden rotate-y-180 bg-slate-900 border-2 border-indigo-500/70 rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-2xl">
+                <div className="flex items-center justify-between text-xs text-emerald-400 font-semibold">
+                  <span>VERSO · RESPOSTA OFICIAL</span>
+                  <span className="inline-flex items-center gap-1 text-slate-400">
+                    <RotateCw className="w-3.5 h-3.5" />
+                    <span>Clique para voltar</span>
+                  </span>
+                </div>
+
+                <div className="my-auto py-4 space-y-4">
+                  <p className="text-sm sm:text-lg text-slate-100 leading-relaxed text-center">
+                    {currentCard.back}
+                  </p>
+
+                  {currentCard.sourceExcerpt && (
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-xs text-slate-400 flex items-start gap-2">
+                      <FileText className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                      <span>
+                        <strong className="text-slate-300">Fonte no documento:</strong> &ldquo;
+                        {currentCard.sourceExcerpt}&rdquo;
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-center text-[11px] text-slate-400">
+                  Avalie sua recordação abaixo para atualizar a caixa Leitner
+                </div>
               </div>
-            </form>
+            </div>
+          </div>
+
+          {/* Navigation & Leitner Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFlipped(false);
+                  setShowHint(false);
+                  setCurrentIndex((prev) => (prev - 1 + activeDeck.length) % activeDeck.length);
+                }}
+                className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFlipped(false);
+                  setShowHint(false);
+                  setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
+                }}
+                className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => handleReviewAnswer(false)}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition-colors cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Preciso Revisar (Volta Caixa 1)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleReviewAnswer(true)}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-colors cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Acertei (Avançar Caixa)</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
